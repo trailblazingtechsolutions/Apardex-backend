@@ -21,6 +21,10 @@ import { MailerModule } from './mailer/mailer.module';
         username: config.get<string>('DB_USERNAME'),
         password: config.get<string>('DB_PASSWORD'),
         database: config.get<string>('DB_NAME'),
+        ssl:
+          config.get<string>('DB_SSL') === 'true'
+            ? { rejectUnauthorized: false }
+            : false,
         synchronize: config.get<string>('NODE_ENV') !== 'production',
         autoLoadEntities: true,
       }),
