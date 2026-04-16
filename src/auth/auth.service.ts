@@ -59,7 +59,9 @@ export class AuthService {
 
     await this.mailerService.sendOtp(user.email, user.firstName, otp);
 
-    return { message: 'Registration successful. Check your email for the OTP.' };
+    return {
+      message: 'Registration successful. Check your email for the OTP.',
+    };
   }
 
   async registerHost(dto: HostRegisterDto) {
@@ -79,7 +81,9 @@ export class AuthService {
 
     await this.mailerService.sendOtp(user.email, user.firstName, otp);
 
-    return { message: 'Host registration successful. Check your email for the OTP.' };
+    return {
+      message: 'Host registration successful. Check your email for the OTP.',
+    };
   }
 
   async verifyEmail(dto: VerifyOtpDto) {
@@ -87,7 +91,8 @@ export class AuthService {
     if (!user) throw new BadRequestException('Invalid email');
 
     if (user.otp !== dto.otp) throw new BadRequestException('Invalid OTP');
-    if (!user.otpExpiresAt || new Date() > user.otpExpiresAt) throw new BadRequestException('OTP has expired');
+    if (!user.otpExpiresAt || new Date() > user.otpExpiresAt)
+      throw new BadRequestException('OTP has expired');
 
     await this.userService.update(user.id, {
       isEmailVerified: true,
@@ -102,13 +107,16 @@ export class AuthService {
     const user = await this.userService.findByEmailWithPassword(dto.email);
     if (!user) throw new UnauthorizedException('Invalid credentials');
 
-    if (user.role !== expectedRole) throw new UnauthorizedException('Invalid credentials');
+    if (user.role !== expectedRole)
+      throw new UnauthorizedException('Invalid credentials');
 
     const passwordMatch = await bcrypt.compare(dto.password, user.password);
     if (!passwordMatch) throw new UnauthorizedException('Invalid credentials');
 
     if (!user.isEmailVerified)
-      throw new UnauthorizedException('Please verify your email before logging in');
+      throw new UnauthorizedException(
+        'Please verify your email before logging in',
+      );
 
     const token = this.generateToken(user);
     return { accessToken: token };
@@ -116,7 +124,8 @@ export class AuthService {
 
   async forgotPassword(dto: ForgotPasswordDto) {
     const user = await this.userService.findByEmail(dto.email);
-    if (!user) return { message: 'If this email exists, a reset OTP has been sent.' };
+    if (!user)
+      return { message: 'If this email exists, a reset OTP has been sent.' };
 
     const otp = this.generateOtp();
     await this.userService.update(user.id, {
@@ -124,7 +133,11 @@ export class AuthService {
       otpExpiresAt: this.getOtpExpiry(),
     });
 
-    await this.mailerService.sendPasswordResetOtp(user.email, user.firstName, otp);
+    await this.mailerService.sendPasswordResetOtp(
+      user.email,
+      user.firstName,
+      otp,
+    );
 
     return { message: 'If this email exists, a reset OTP has been sent.' };
   }
@@ -134,7 +147,8 @@ export class AuthService {
     if (!user) throw new BadRequestException('Invalid email');
 
     if (user.otp !== dto.otp) throw new BadRequestException('Invalid OTP');
-    if (!user.otpExpiresAt || new Date() > user.otpExpiresAt) throw new BadRequestException('OTP has expired');
+    if (!user.otpExpiresAt || new Date() > user.otpExpiresAt)
+      throw new BadRequestException('OTP has expired');
 
     const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
     await this.userService.update(user.id, {

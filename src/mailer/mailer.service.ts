@@ -14,7 +14,11 @@ export class MailerService {
     });
   }
 
-  async sendPasswordResetOtp(email: string, firstName: string, otp: string): Promise<void> {
+  async sendPasswordResetOtp(
+    email: string,
+    firstName: string,
+    otp: string,
+  ): Promise<void> {
     await this.mailer.sendMail({
       to: email,
       subject: 'Reset your Apardex password',
