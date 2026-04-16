@@ -35,10 +35,10 @@ export class User {
   @Column({ default: false })
   isEmailVerified: boolean;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   otp: string | null;
 
-  @Column({ nullable: true, type: 'timestamp' })
+  @Column({ type: 'timestamp', nullable: true })
   otpExpiresAt: Date | null;
 
   // Host-specific fields
