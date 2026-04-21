@@ -3,9 +3,17 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from './user.entity';
 import { UserService } from './user.service';
 import { UserController } from './user.controller';
+import { Booking } from '../booking/booking.entity';
+import { Favorite } from '../favorites/favorite.entity';
+import { Message } from '../messaging/message.entity';
+import { Notification } from '../notifications/notification.entity';
+import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User])],
+  imports: [
+    TypeOrmModule.forFeature([User, Booking, Favorite, Message, Notification]),
+    CloudinaryModule,
+  ],
   controllers: [UserController],
   providers: [UserService],
   exports: [UserService],

@@ -7,6 +7,13 @@ import { UserModule } from './user/user.module';
 import { AuthModule } from './auth/auth.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { MailerModule } from './mailer/mailer.module';
+import { PropertyModule } from './property/property.module';
+import { FavoritesModule } from './favorites/favorites.module';
+import { BookingModule } from './booking/booking.module';
+import { ReviewModule } from './review/review.module';
+import { MessagingModule } from './messaging/messaging.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { PaymentModule } from './payment/payment.module';
 
 @Module({
   imports: [
@@ -27,12 +34,24 @@ import { MailerModule } from './mailer/mailer.module';
             : false,
         synchronize: config.get<string>('NODE_ENV') !== 'production',
         autoLoadEntities: true,
+        extra: {
+          max: 5,
+          idleTimeoutMillis: 10000,
+          connectionTimeoutMillis: 3000,
+        },
       }),
     }),
-    UserModule,
     AuthModule,
+    UserModule,
     CloudinaryModule,
     MailerModule,
+    PropertyModule,
+    FavoritesModule,
+    BookingModule,
+    ReviewModule,
+    MessagingModule,
+    NotificationsModule,
+    PaymentModule,
   ],
   controllers: [AppController],
   providers: [AppService],

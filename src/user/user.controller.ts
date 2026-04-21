@@ -1,6 +1,16 @@
-import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Patch,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
+  ApiConsumes,
   ApiOperation,
   ApiResponse,
   ApiTags,
@@ -30,11 +40,23 @@ export class UserController {
   }
 
   @Patch('profile')
-  @ApiOperation({ summary: 'Update current user profile' })
+  @UseInterceptors(FileInterceptor('avatar'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Update profile (fields + optional avatar image)' })
   @ApiResponse({ status: 200, description: 'Profile updated successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  updateProfile(@CurrentUser() user: User, @Body() dto: UpdateProfileDto) {
-    return this.userService.update(user.id, dto);
+  updateProfile(
+    @CurrentUser() user: User,
+    @Body() dto: UpdateProfileDto,
+    @UploadedFile()
+    file?: {
+      buffer: Buffer;
+      originalname: string;
+      mimetype: string;
+      size: number;
+    },
+  ) {
+    return this.userService.updateWithAvatar(user.id, dto, file);
   }
 
   @Patch('change-password')
@@ -48,5 +70,16 @@ export class UserController {
   ) {
     await this.userService.changePassword(user.id, dto);
     return { message: 'Password changed successfully' };
+  }
+
+  @Get('dashboard')
+  @ApiOperation({ summary: 'Get customer dashboard overview' })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Stats (active bookings, saved properties, unread messages, new notifications), upcoming stay, recent messages, recently saved properties',
+  })
+  getDashboard(@CurrentUser() user: User) {
+    return this.userService.getDashboard(user.id);
   }
 }

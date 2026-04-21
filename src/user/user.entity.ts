@@ -51,6 +51,9 @@ export class User {
   @Column({ nullable: true })
   phoneNumber: string;
 
+  @Column({ type: 'varchar', nullable: true })
+  avatarUrl: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

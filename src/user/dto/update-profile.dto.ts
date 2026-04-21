@@ -1,5 +1,6 @@
 import { IsOptional, IsString, MinLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import 'multer';
 
 export class UpdateProfileDto {
   @ApiPropertyOptional({ example: 'John' })
@@ -16,6 +17,18 @@ export class UpdateProfileDto {
   @IsString()
   @IsOptional()
   phoneNumber?: string;
+
+  @ApiPropertyOptional({
+    type: 'string',
+    format: 'binary',
+    description: 'Profile avatar image',
+  })
+  avatar?: {
+    buffer: Buffer;
+    originalname: string;
+    mimetype: string;
+    size: number;
+  };
 }
 
 export class ChangePasswordDto {
