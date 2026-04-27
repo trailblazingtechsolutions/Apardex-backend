@@ -23,6 +23,7 @@ import { PropertyService } from './property.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { SearchPropertyDto } from './dto/search-property.dto';
+import { BlockDatesDto } from './dto/block-dates.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -77,6 +78,43 @@ export class PropertyController {
   @ApiResponse({ status: 403, description: 'Host role required' })
   getMyListings(@CurrentUser() user: User) {
     return this.propertyService.findByHost(user.id);
+  }
+
+  // ─── Availability / Calendar ──────────────────────────────────────────────
+
+  @Get(':id/availability')
+  @ApiOperation({ summary: 'Get blocked dates for a property (public)' })
+  @ApiResponse({ status: 200, description: 'List of blocked dates' })
+  getBlockedDates(@Param('id') id: string) {
+    return this.propertyService.getBlockedDates(id);
+  }
+
+  @Post(':id/availability/block')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.HOST)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Block dates on a property (Host only)' })
+  @ApiResponse({ status: 201, description: 'Dates blocked' })
+  blockDates(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @Body() dto: BlockDatesDto,
+  ) {
+    return this.propertyService.blockDates(id, user.id, dto.dates, dto.reason);
+  }
+
+  @Delete(':id/availability/:date')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.HOST)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Unblock a date on a property (Host only)' })
+  @ApiResponse({ status: 200, description: 'Date unblocked' })
+  unblockDate(
+    @Param('id') id: string,
+    @Param('date') date: string,
+    @CurrentUser() user: User,
+  ) {
+    return this.propertyService.unblockDate(id, user.id, date);
   }
 
   // ─── Public parameterized endpoint (after all static routes) ─────────────
@@ -137,13 +175,31 @@ export class PropertyController {
     return this.propertyService.remove(id, user.id);
   }
 
+  @Patch(':id/visibility')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.HOST)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: 'Activate or deactivate own listing (Host only)',
+    description: 'Allowed values: active | inactive',
+  })
+  @ApiResponse({ status: 200, description: 'Visibility updated' })
+  @ApiResponse({ status: 403, description: 'Access denied' })
+  updateVisibility(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @Body('status') status: PropertyStatus.ACTIVE | PropertyStatus.INACTIVE,
+  ) {
+    return this.propertyService.updateVisibility(id, user.id, status);
+  }
+
   // ─── Admin endpoints ───────────────────────────────────────────────────────
 
   @Patch(':id/status')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Update property status (Admin only)' })
+  @ApiOperation({ summary: 'Update property status to any value (Admin only)' })
   @ApiResponse({ status: 200, description: 'Status updated' })
   @ApiResponse({ status: 403, description: 'Admin role required' })
   updateStatus(

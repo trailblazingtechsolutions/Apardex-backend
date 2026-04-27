@@ -9,7 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { Payment, PaymentStatus } from './payment.entity';
 import { PaymentProviderName } from './payment-provider.types';
 import { IPaymentProvider } from './payment-provider.interface';
-import { InitiatePaymentDto } from './dto/initiate-payment.dto';
+import { InitiatePaymentDto, PaymentMethod } from './dto/initiate-payment.dto';
 import { Booking, BookingStatus } from '../booking/booking.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/notification.entity';
@@ -67,13 +67,29 @@ export class PaymentService {
       throw new BadRequestException('Cannot pay for a cancelled booking');
     }
 
-    // Smart routing: non-NGN currency → always use Flutterwave
-    let providerName: string = dto.provider;
-    if (
-      providerName === PaymentProviderName.PAYSTACK &&
-      dto.currency !== 'NGN'
-    ) {
+    // Route to provider based on payment method + currency
+    let providerName: PaymentProviderName;
+    let channels: string[] | undefined;
+    let paymentOptions: string | undefined;
+
+    if (dto.paymentMethod === PaymentMethod.APPLE_PAY) {
       providerName = PaymentProviderName.FLUTTERWAVE;
+      paymentOptions = 'applepay';
+    } else if (dto.paymentMethod === PaymentMethod.BANK_TRANSFER) {
+      providerName =
+        dto.currency === 'NGN'
+          ? PaymentProviderName.PAYSTACK
+          : PaymentProviderName.FLUTTERWAVE;
+      channels = ['bank_transfer'];
+      paymentOptions = 'banktransfer';
+    } else {
+      // card — Paystack for NGN, Flutterwave for international
+      providerName =
+        dto.currency === 'NGN'
+          ? PaymentProviderName.PAYSTACK
+          : PaymentProviderName.FLUTTERWAVE;
+      channels = ['card'];
+      paymentOptions = 'card';
     }
 
     const provider = this.getProvider(providerName);
@@ -87,6 +103,8 @@ export class PaymentService {
       reference,
       bookingId: booking.id,
       callbackUrl,
+      channels,
+      paymentOptions,
     });
 
     await this.paymentRepository.save(
@@ -110,7 +128,7 @@ export class PaymentService {
       paymentUrl: result.paymentUrl,
       reference,
       providerUsed: providerName,
-      routedFrom: dto.provider !== providerName ? dto.provider : null,
+      paymentMethod: dto.paymentMethod,
     };
   }
 

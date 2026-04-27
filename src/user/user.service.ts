@@ -12,6 +12,7 @@ import { Booking, BookingStatus } from '../booking/booking.entity';
 import { Favorite } from '../favorites/favorite.entity';
 import { Message } from '../messaging/message.entity';
 import { Notification } from '../notifications/notification.entity';
+import { Property, PropertyStatus } from '../property/property.entity';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 
 @Injectable()
@@ -27,6 +28,8 @@ export class UserService {
     private readonly messageRepository: Repository<Message>,
     @InjectRepository(Notification)
     private readonly notificationRepository: Repository<Notification>,
+    @InjectRepository(Property)
+    private readonly propertyRepository: Repository<Property>,
     private readonly cloudinaryService: CloudinaryService,
   ) {}
 
@@ -162,6 +165,118 @@ export class UserService {
       upcomingStay: upcomingStay ?? null,
       recentMessages,
       recentlySaved,
+    };
+  }
+
+  async getHostDashboard(hostId: string) {
+    const today = new Date().toISOString().split('T')[0];
+    const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split('T')[0];
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+      .toISOString()
+      .split('T')[0];
+
+    const [
+      totalListings,
+      activeListings,
+      totalBookings,
+      pendingBookings,
+      thisMonthRevenue,
+      totalRevenue,
+      avgRatingResult,
+      upcomingCheckIns,
+      recentBookings,
+      pendingApprovals,
+    ] = await Promise.all([
+      this.propertyRepository.count({ where: { hostId } }),
+
+      this.propertyRepository.count({
+        where: { hostId, status: PropertyStatus.ACTIVE },
+      }),
+
+      this.bookingRepository
+        .createQueryBuilder('b')
+        .leftJoin('b.property', 'p')
+        .where('p.hostId = :hostId', { hostId })
+        .getCount(),
+
+      this.bookingRepository
+        .createQueryBuilder('b')
+        .leftJoin('b.property', 'p')
+        .where('p.hostId = :hostId', { hostId })
+        .andWhere('b.status = :status', { status: BookingStatus.PENDING })
+        .getCount(),
+
+      this.bookingRepository
+        .createQueryBuilder('b')
+        .leftJoin('b.property', 'p')
+        .select('COALESCE(SUM(b.totalPrice), 0)', 'total')
+        .where('p.hostId = :hostId', { hostId })
+        .andWhere('b.isPaid = true')
+        .andWhere('b.createdAt >= :monthStart', { monthStart })
+        .getRawOne<{ total: string }>(),
+
+      this.bookingRepository
+        .createQueryBuilder('b')
+        .leftJoin('b.property', 'p')
+        .select('COALESCE(SUM(b.totalPrice), 0)', 'total')
+        .where('p.hostId = :hostId', { hostId })
+        .andWhere('b.isPaid = true')
+        .getRawOne<{ total: string }>(),
+
+      this.propertyRepository
+        .createQueryBuilder('p')
+        .select('COALESCE(AVG(p.avgRating), 0)', 'avg')
+        .where('p.hostId = :hostId', { hostId })
+        .getRawOne<{ avg: string }>(),
+
+      this.bookingRepository
+        .createQueryBuilder('b')
+        .leftJoinAndSelect('b.property', 'p')
+        .leftJoinAndSelect('b.user', 'user')
+        .where('p.hostId = :hostId', { hostId })
+        .andWhere('b.status IN (:...statuses)', {
+          statuses: [BookingStatus.CONFIRMED, BookingStatus.ACTIVE],
+        })
+        .andWhere('b.checkIn >= :today', { today })
+        .andWhere('b.checkIn <= :nextWeek', { nextWeek })
+        .orderBy('b.checkIn', 'ASC')
+        .getMany(),
+
+      this.bookingRepository
+        .createQueryBuilder('b')
+        .leftJoinAndSelect('b.property', 'p')
+        .leftJoinAndSelect('b.user', 'user')
+        .where('p.hostId = :hostId', { hostId })
+        .orderBy('b.createdAt', 'DESC')
+        .limit(5)
+        .getMany(),
+
+      this.bookingRepository
+        .createQueryBuilder('b')
+        .leftJoinAndSelect('b.property', 'p')
+        .leftJoinAndSelect('b.user', 'user')
+        .where('p.hostId = :hostId', { hostId })
+        .andWhere('b.status = :status', { status: BookingStatus.PENDING })
+        .orderBy('b.createdAt', 'ASC')
+        .getMany(),
+    ]);
+
+    return {
+      stats: {
+        totalListings,
+        activeListings,
+        totalBookings,
+        pendingBookings,
+        thisMonthRevenue: parseFloat(thisMonthRevenue?.total ?? '0'),
+        totalRevenue: parseFloat(totalRevenue?.total ?? '0'),
+        avgRating: parseFloat(avgRatingResult?.avg ?? '0'),
+      },
+      upcomingCheckIns,
+      recentBookings,
+      pendingApprovals,
     };
   }
 }

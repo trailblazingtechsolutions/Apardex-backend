@@ -61,6 +61,14 @@ export class BookingController {
     return this.bookingService.findHostBookings(user.id, status);
   }
 
+  @Get('host/revenue')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.HOST)
+  @ApiOperation({ summary: 'Get monthly revenue breakdown for last 12 months (Host only)' })
+  getHostRevenue(@CurrentUser() user: User) {
+    return this.bookingService.getHostRevenue(user.id);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get a booking by ID' })
   @ApiResponse({ status: 404, description: 'Booking not found' })
@@ -88,5 +96,29 @@ export class BookingController {
     @Body() dto: ModifyBookingDto,
   ) {
     return this.bookingService.modify(id, user.id, dto);
+  }
+
+  @Patch(':id/confirm')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.HOST)
+  @ApiOperation({ summary: 'Confirm a pending booking (Host only)' })
+  @ApiResponse({ status: 200, description: 'Booking confirmed' })
+  @ApiResponse({ status: 403, description: 'Not your property' })
+  confirmByHost(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.bookingService.confirmByHost(id, user.id);
+  }
+
+  @Patch(':id/reject')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.HOST)
+  @ApiOperation({ summary: 'Reject a booking (Host only)' })
+  @ApiResponse({ status: 200, description: 'Booking rejected' })
+  @ApiResponse({ status: 403, description: 'Not your property' })
+  rejectByHost(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @Body('reason') reason?: string,
+  ) {
+    return this.bookingService.rejectByHost(id, user.id, reason);
   }
 }

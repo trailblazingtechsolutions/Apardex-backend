@@ -32,6 +32,10 @@ export class ReviewService {
       throw new BadRequestException('You can only review completed bookings');
     }
 
+    if (booking.property?.hostId === userId) {
+      throw new BadRequestException('You cannot review your own property');
+    }
+
     const existing = await this.reviewRepository.findOne({
       where: { bookingId: dto.bookingId },
     });
@@ -52,6 +56,23 @@ export class ReviewService {
 
     return this.reviewRepository.find({
       where: { propertyId },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async findByHost(hostId: string): Promise<Review[]> {
+    return this.reviewRepository
+      .createQueryBuilder('review')
+      .leftJoinAndSelect('review.property', 'property')
+      .leftJoinAndSelect('review.user', 'user')
+      .where('property.hostId = :hostId', { hostId })
+      .orderBy('review.createdAt', 'DESC')
+      .getMany();
+  }
+
+  async findByUser(userId: string): Promise<Review[]> {
+    return this.reviewRepository.find({
+      where: { userId },
       order: { createdAt: 'DESC' },
     });
   }

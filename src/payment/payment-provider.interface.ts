@@ -7,6 +7,8 @@ export interface InitiateParams {
   reference: string;
   bookingId: string;
   callbackUrl: string;
+  channels?: string[];
+  paymentOptions?: string;
 }
 
 export interface InitiateResult {

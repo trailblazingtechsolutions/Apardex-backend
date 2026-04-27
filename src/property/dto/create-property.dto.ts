@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsBoolean,
   IsEnum,
   IsInt,
   IsNotEmpty,
@@ -101,4 +102,37 @@ export class CreatePropertyDto {
   @IsString()
   @IsOptional()
   checkOutTime?: string;
+
+  @ApiPropertyOptional({ example: 50 })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  cleaningFee?: number;
+
+  @ApiPropertyOptional({ example: 7 })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  serviceFeePercentage?: number;
+
+  @ApiPropertyOptional({ example: 5 })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  taxPercentage?: number;
+
+  @ApiPropertyOptional({ example: 6.4603 })
+  @IsNumber()
+  @IsOptional()
+  latitude?: number;
+
+  @ApiPropertyOptional({ example: 3.3841 })
+  @IsNumber()
+  @IsOptional()
+  longitude?: number;
+
+  @ApiPropertyOptional({ example: false })
+  @IsBoolean()
+  @IsOptional()
+  instantBook?: boolean;
 }

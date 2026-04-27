@@ -1,6 +1,11 @@
 import { IsEnum, IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { PaymentProviderName } from '../payment-provider.types';
+
+export enum PaymentMethod {
+  CARD = 'card',
+  BANK_TRANSFER = 'bank_transfer',
+  APPLE_PAY = 'apple_pay',
+}
 
 export const SUPPORTED_CURRENCIES = [
   'NGN',
@@ -18,12 +23,13 @@ export class InitiatePaymentDto {
   bookingId!: string;
 
   @ApiProperty({
-    enum: [PaymentProviderName.PAYSTACK, PaymentProviderName.FLUTTERWAVE],
+    enum: PaymentMethod,
+    example: PaymentMethod.CARD,
     description:
-      'Preferred provider. Non-NGN payments are automatically routed to Flutterwave.',
+      'Payment method chosen by the user. Backend picks the provider automatically.',
   })
-  @IsEnum([PaymentProviderName.PAYSTACK, PaymentProviderName.FLUTTERWAVE])
-  provider!: PaymentProviderName.PAYSTACK | PaymentProviderName.FLUTTERWAVE;
+  @IsEnum(PaymentMethod)
+  paymentMethod!: PaymentMethod;
 
   @ApiProperty({ example: 'NGN', enum: SUPPORTED_CURRENCIES })
   @IsIn(SUPPORTED_CURRENCIES)

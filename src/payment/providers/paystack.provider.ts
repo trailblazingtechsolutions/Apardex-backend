@@ -15,7 +15,7 @@ export class PaystackProvider implements IPaymentProvider {
   private readonly secretKey: string;
   private readonly baseUrl = 'https://api.paystack.co';
 
-  constructor(private readonly config: ConfigService) {
+  constructor(config: ConfigService) {
     this.secretKey = config.get<string>('PAYSTACK_SECRET_KEY', '');
   }
 
@@ -32,6 +32,7 @@ export class PaystackProvider implements IPaymentProvider {
         currency: params.currency,
         reference: params.reference,
         callback_url: params.callbackUrl,
+        channels: params.channels,
         metadata: { bookingId: params.bookingId },
       }),
     });

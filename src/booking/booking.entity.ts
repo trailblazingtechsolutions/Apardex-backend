@@ -48,6 +48,18 @@ export class Booking {
   guests: number;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
+  basePrice: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  cleaningFee: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  serviceFee: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  tax: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2 })
   totalPrice: number;
 
   @Column({ type: 'int' })

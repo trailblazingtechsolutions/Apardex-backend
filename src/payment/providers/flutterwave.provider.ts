@@ -16,7 +16,7 @@ export class FlutterwaveProvider implements IPaymentProvider {
   private readonly secretHash: string;
   private readonly baseUrl = 'https://api.flutterwave.com/v3';
 
-  constructor(private readonly config: ConfigService) {
+  constructor(config: ConfigService) {
     this.secretKey = config.get<string>('FLUTTERWAVE_SECRET_KEY', '');
     this.secretHash = config.get<string>('FLUTTERWAVE_SECRET_HASH', '');
   }
@@ -33,6 +33,7 @@ export class FlutterwaveProvider implements IPaymentProvider {
         amount: params.amount,
         currency: params.currency,
         redirect_url: params.callbackUrl,
+        payment_options: params.paymentOptions,
         customer: { email: params.email },
         meta: { bookingId: params.bookingId },
       }),

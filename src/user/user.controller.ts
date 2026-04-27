@@ -82,4 +82,15 @@ export class UserController {
   getDashboard(@CurrentUser() user: User) {
     return this.userService.getDashboard(user.id);
   }
+
+  @Get('host-dashboard')
+  @ApiOperation({ summary: 'Get host dashboard overview (Host only)' })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Stats (listings, bookings, revenue, avg rating), upcoming check-ins, pending approvals, recent bookings',
+  })
+  getHostDashboard(@CurrentUser() user: User) {
+    return this.userService.getHostDashboard(user.id);
+  }
 }

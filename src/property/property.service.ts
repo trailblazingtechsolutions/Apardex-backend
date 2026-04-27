@@ -1,4 +1,6 @@
 import {
+  BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -6,6 +8,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Property, PropertyStatus } from './property.entity';
+import { PropertyAvailability } from './property-availability.entity';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { SearchPropertyDto } from './dto/search-property.dto';
@@ -16,6 +19,8 @@ export class PropertyService {
   constructor(
     @InjectRepository(Property)
     private readonly propertyRepository: Repository<Property>,
+    @InjectRepository(PropertyAvailability)
+    private readonly availabilityRepository: Repository<PropertyAvailability>,
     private readonly cloudinaryService: CloudinaryService,
   ) {}
 
@@ -149,5 +154,81 @@ export class PropertyService {
     await this.findById(id);
     await this.propertyRepository.update(id, { status });
     return this.findById(id);
+  }
+
+  async updateVisibility(
+    id: string,
+    hostId: string,
+    status: PropertyStatus.ACTIVE | PropertyStatus.INACTIVE,
+  ): Promise<Property> {
+    const property = await this.findById(id);
+    if (property.hostId !== hostId) throw new ForbiddenException('Access denied');
+    await this.propertyRepository.update(id, { status });
+    return this.findById(id);
+  }
+
+  // ─── Availability / Calendar ───────────────────────────────────────────────
+
+  async getBlockedDates(propertyId: string): Promise<PropertyAvailability[]> {
+    return this.availabilityRepository.find({
+      where: { propertyId },
+      order: { date: 'ASC' },
+    });
+  }
+
+  async blockDates(
+    propertyId: string,
+    hostId: string,
+    dates: string[],
+    reason?: string,
+  ): Promise<PropertyAvailability[]> {
+    const property = await this.findById(propertyId);
+    if (property.hostId !== hostId) throw new ForbiddenException('Access denied');
+
+    const saved: PropertyAvailability[] = [];
+    for (const date of dates) {
+      const existing = await this.availabilityRepository.findOne({
+        where: { propertyId, date },
+      });
+      if (existing) throw new ConflictException(`Date ${date} is already blocked`);
+      const entry = this.availabilityRepository.create({
+        propertyId,
+        date,
+        reason: reason ?? null,
+      });
+      saved.push(await this.availabilityRepository.save(entry));
+    }
+    return saved;
+  }
+
+  async unblockDate(
+    propertyId: string,
+    hostId: string,
+    date: string,
+  ): Promise<void> {
+    const property = await this.findById(propertyId);
+    if (property.hostId !== hostId) throw new ForbiddenException('Access denied');
+
+    const entry = await this.availabilityRepository.findOne({
+      where: { propertyId, date },
+    });
+    if (!entry) throw new NotFoundException('Blocked date not found');
+    await this.availabilityRepository.delete(entry.id);
+  }
+
+  async isAvailable(
+    propertyId: string,
+    checkIn: string,
+    checkOut: string,
+  ): Promise<boolean> {
+    const blocked = await this.availabilityRepository
+      .createQueryBuilder('a')
+      .where('a.propertyId = :propertyId', { propertyId })
+      .andWhere('a.date >= :checkIn AND a.date < :checkOut', {
+        checkIn,
+        checkOut,
+      })
+      .getOne();
+    return !blocked;
   }
 }

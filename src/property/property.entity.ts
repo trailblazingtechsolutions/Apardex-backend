@@ -93,6 +93,27 @@ export class Property {
   @Column({ default: '11:00' })
   checkOutTime: string;
 
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  cleaningFee: number;
+
+  @Column({ type: 'decimal', precision: 5, scale: 2, default: 0 })
+  serviceFeePercentage: number;
+
+  @Column({ type: 'decimal', precision: 5, scale: 2, default: 0 })
+  taxPercentage: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 6, nullable: true })
+  latitude: number | null;
+
+  @Column({ type: 'decimal', precision: 10, scale: 6, nullable: true })
+  longitude: number | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  coverImage: string | null;
+
+  @Column({ default: false })
+  instantBook: boolean;
+
   @Column({
     type: 'enum',
     enum: PropertyStatus,

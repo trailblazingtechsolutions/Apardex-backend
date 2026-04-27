@@ -7,11 +7,12 @@ import { Booking } from '../booking/booking.entity';
 import { Favorite } from '../favorites/favorite.entity';
 import { Message } from '../messaging/message.entity';
 import { Notification } from '../notifications/notification.entity';
+import { Property } from '../property/property.entity';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Booking, Favorite, Message, Notification]),
+    TypeOrmModule.forFeature([User, Booking, Favorite, Message, Notification, Property]),
     CloudinaryModule,
   ],
   controllers: [UserController],
