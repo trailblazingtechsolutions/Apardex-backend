@@ -6,9 +6,9 @@ export class VerifyOtpDto {
   @IsEmail()
   email: string;
 
-  @ApiProperty({ example: '123456', minLength: 6, maxLength: 6 })
+  @ApiProperty({ example: '1234', minLength: 4, maxLength: 4 })
   @IsString()
   @IsNotEmpty()
-  @Length(6, 6)
+  @Length(4, 4)
   otp: string;
 }
