@@ -3,15 +3,10 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import 'multer';
 
 export class UpdateProfileDto {
-  @ApiPropertyOptional({ example: 'John' })
+  @ApiPropertyOptional({ example: 'John Doe' })
   @IsString()
   @IsOptional()
-  firstName?: string;
-
-  @ApiPropertyOptional({ example: 'Doe' })
-  @IsString()
-  @IsOptional()
-  lastName?: string;
+  fullName?: string;
 
   @ApiPropertyOptional({ example: '+2348012345678' })
   @IsString()

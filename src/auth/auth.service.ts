@@ -57,7 +57,11 @@ export class AuthService {
       otpExpiresAt: this.getOtpExpiry(),
     });
 
-    await this.mailerService.sendOtp(user.email, user.firstName, otp);
+    try {
+      await this.mailerService.sendOtp(user.email, user.fullName, otp);
+    } catch {
+      // Email failure should not block registration
+    }
 
     return {
       message: 'Registration successful. Check your email for the OTP.',
@@ -79,7 +83,11 @@ export class AuthService {
       otpExpiresAt: this.getOtpExpiry(),
     });
 
-    await this.mailerService.sendOtp(user.email, user.firstName, otp);
+    try {
+      await this.mailerService.sendOtp(user.email, user.fullName, otp);
+    } catch {
+      // Email failure should not block registration
+    }
 
     return {
       message: 'Host registration successful. Check your email for the OTP.',
@@ -133,11 +141,11 @@ export class AuthService {
       otpExpiresAt: this.getOtpExpiry(),
     });
 
-    await this.mailerService.sendPasswordResetOtp(
-      user.email,
-      user.firstName,
-      otp,
-    );
+    try {
+      await this.mailerService.sendPasswordResetOtp(user.email, user.fullName, otp);
+    } catch {
+      // Email failure should not block the forgot-password flow
+    }
 
     return { message: 'If this email exists, a reset OTP has been sent.' };
   }
