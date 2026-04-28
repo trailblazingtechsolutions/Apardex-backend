@@ -32,12 +32,12 @@ import { PaymentModule } from './payment/payment.module';
           config.get<string>('DB_SSL') === 'true'
             ? { rejectUnauthorized: false }
             : false,
-        synchronize: config.get<string>('NODE_ENV') !== 'production',
+        synchronize: config.get<string>('DB_SYNC') === 'true',
         autoLoadEntities: true,
         extra: {
           max: 5,
-          idleTimeoutMillis: 10000,
-          connectionTimeoutMillis: 3000,
+          idleTimeoutMillis: 30000,
+          connectionTimeoutMillis: 15000,
         },
       }),
     }),
