@@ -7,6 +7,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -60,6 +61,19 @@ export class UserAuthController {
     return this.authService.verifyEmail(dto);
   }
 
+  @Post('resend-otp')
+  @ApiOperation({
+    summary: 'Resend email verification OTP (unverified accounts only)',
+  })
+  @ApiResponse({ status: 200, description: 'OTP sent to email' })
+  @ApiResponse({
+    status: 400,
+    description: 'No account found / already verified',
+  })
+  resendOtp(@Body() dto: ForgotPasswordDto) {
+    return this.authService.resendVerificationOtp(dto.email);
+  }
+
   @Post('forgot-password')
   @ApiOperation({ summary: 'Request password reset OTP' })
   @ApiResponse({ status: 200, description: 'Reset OTP sent if email exists' })
@@ -88,11 +102,30 @@ export class HostAuthController {
   ) {}
 
   @Post('register')
-  @ApiOperation({ summary: 'Register a new host' })
+  @UseInterceptors(FileInterceptor('document', { storage: memoryStorage() }))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Register a new host (document upload required)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['fullName', 'email', 'password', 'phoneNumber', 'document'],
+      properties: {
+        fullName: { type: 'string', example: 'Jane Smith' },
+        email: { type: 'string', example: 'jane@example.com' },
+        password: { type: 'string', example: 'password123' },
+        phoneNumber: { type: 'string', example: '+2348012345678' },
+        document: { type: 'string', format: 'binary' },
+      },
+    },
+  })
   @ApiResponse({ status: 201, description: 'OTP sent to email' })
+  @ApiResponse({ status: 400, description: 'Document file is required' })
   @ApiResponse({ status: 409, description: 'Email already in use' })
-  register(@Body() dto: HostRegisterDto) {
-    return this.authService.registerHost(dto);
+  register(
+    @Body() dto: HostRegisterDto,
+    @UploadedFile() document: Express.Multer.File,
+  ) {
+    return this.authService.registerHost(dto, document);
   }
 
   @Post('login')
@@ -109,6 +142,19 @@ export class HostAuthController {
   @ApiResponse({ status: 400, description: 'Invalid or expired OTP' })
   verifyEmail(@Body() dto: VerifyOtpDto) {
     return this.authService.verifyEmail(dto);
+  }
+
+  @Post('resend-otp')
+  @ApiOperation({
+    summary: 'Resend email verification OTP (unverified accounts only)',
+  })
+  @ApiResponse({ status: 200, description: 'OTP sent to email' })
+  @ApiResponse({
+    status: 400,
+    description: 'No account found / already verified',
+  })
+  resendOtp(@Body() dto: ForgotPasswordDto) {
+    return this.authService.resendVerificationOtp(dto.email);
   }
 
   @Post('forgot-password')
@@ -128,7 +174,7 @@ export class HostAuthController {
 
   @Post('upload-document')
   @UseGuards(JwtAuthGuard)
-  @UseInterceptors(FileInterceptor('document'))
+  @UseInterceptors(FileInterceptor('document', { storage: memoryStorage() }))
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Upload host identity document (requires auth)' })
   @ApiConsumes('multipart/form-data')

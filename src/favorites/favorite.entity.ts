@@ -23,7 +23,7 @@ export class Favorite {
   @Column()
   userId: string;
 
-  @ManyToOne(() => Property, { eager: true, onDelete: 'CASCADE' })
+  @ManyToOne(() => Property, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'propertyId' })
   property: Property;
 

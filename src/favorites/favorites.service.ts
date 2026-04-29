@@ -1,10 +1,11 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import { Favorite } from './favorite.entity';
 
 @Injectable()
@@ -20,8 +21,19 @@ export class FavoritesService {
     });
     if (existing) throw new ConflictException('Property already in favorites');
 
-    const favorite = this.favoriteRepository.create({ userId, propertyId });
-    return this.favoriteRepository.save(favorite);
+    try {
+      const favorite = this.favoriteRepository.create({ userId, propertyId });
+      return await this.favoriteRepository.save(favorite);
+    } catch (err) {
+      if (err instanceof QueryFailedError) {
+        const pg = err as unknown as { code: string };
+        if (pg.code === '23503')
+          throw new NotFoundException('Property not found');
+        if (pg.code === '23505')
+          throw new ConflictException('Property already in favorites');
+      }
+      throw err;
+    }
   }
 
   async remove(userId: string, propertyId: string): Promise<void> {
@@ -33,9 +45,11 @@ export class FavoritesService {
   }
 
   async findAll(userId: string): Promise<Favorite[]> {
-    return this.favoriteRepository.find({
-      where: { userId },
-      order: { createdAt: 'DESC' },
-    });
+    return this.favoriteRepository
+      .createQueryBuilder('fav')
+      .leftJoinAndSelect('fav.property', 'property')
+      .where('fav.userId = :userId', { userId })
+      .orderBy('fav.createdAt', 'DESC')
+      .getMany();
   }
 }

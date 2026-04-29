@@ -8,6 +8,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import {
   ApiBearerAuth,
   ApiConsumes,
@@ -40,7 +41,7 @@ export class UserController {
   }
 
   @Patch('profile')
-  @UseInterceptors(FileInterceptor('avatar'))
+  @UseInterceptors(FileInterceptor('avatar', { storage: memoryStorage() }))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Update profile (fields + optional avatar image)' })
   @ApiResponse({ status: 200, description: 'Profile updated successfully' })

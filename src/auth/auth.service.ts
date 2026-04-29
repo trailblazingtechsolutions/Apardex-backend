@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -15,13 +16,17 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { MailerService } from '../mailer/mailer.service';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly userService: UserService,
     private readonly jwtService: JwtService,
     private readonly mailerService: MailerService,
+    private readonly cloudinaryService: CloudinaryService,
   ) {}
 
   private generateOtp(): string {
@@ -59,8 +64,8 @@ export class AuthService {
 
     try {
       await this.mailerService.sendOtp(user.email, user.fullName, otp);
-    } catch {
-      // Email failure should not block registration
+    } catch (err) {
+      this.logger.error(`Failed to send OTP email to ${user.email}`, err);
     }
 
     return {
@@ -68,9 +73,22 @@ export class AuthService {
     };
   }
 
-  async registerHost(dto: HostRegisterDto) {
+  async registerHost(
+    dto: HostRegisterDto,
+    documentFile: Express.Multer.File,
+  ) {
+    if (!documentFile)
+      throw new BadRequestException(
+        'Identity document is required for host registration',
+      );
+
     const existing = await this.userService.findByEmail(dto.email);
     if (existing) throw new ConflictException('Email already in use');
+
+    const uploadResult = await this.cloudinaryService.uploadFile(
+      documentFile,
+      'host-documents',
+    );
 
     const hashedPassword = await bcrypt.hash(dto.password, 10);
     const otp = this.generateOtp();
@@ -81,12 +99,13 @@ export class AuthService {
       role: UserRole.HOST,
       otp,
       otpExpiresAt: this.getOtpExpiry(),
+      documentUrl: uploadResult.secure_url,
     });
 
     try {
       await this.mailerService.sendOtp(user.email, user.fullName, otp);
-    } catch {
-      // Email failure should not block registration
+    } catch (err) {
+      this.logger.error(`Failed to send OTP email to ${user.email}`, err);
     }
 
     return {
@@ -130,6 +149,28 @@ export class AuthService {
     return { accessToken: token };
   }
 
+  async resendVerificationOtp(email: string) {
+    const user = await this.userService.findByEmail(email);
+    if (!user) throw new BadRequestException('No account found with this email');
+
+    if (user.isEmailVerified)
+      throw new BadRequestException('This email is already verified');
+
+    const otp = this.generateOtp();
+    await this.userService.update(user.id, {
+      otp,
+      otpExpiresAt: this.getOtpExpiry(),
+    });
+
+    try {
+      await this.mailerService.sendOtp(user.email, user.fullName, otp);
+    } catch (err) {
+      this.logger.error(`Failed to resend OTP email to ${user.email}`, err);
+    }
+
+    return { message: 'A new OTP has been sent to your email.' };
+  }
+
   async forgotPassword(dto: ForgotPasswordDto) {
     const user = await this.userService.findByEmail(dto.email);
     if (!user)
@@ -143,8 +184,8 @@ export class AuthService {
 
     try {
       await this.mailerService.sendPasswordResetOtp(user.email, user.fullName, otp);
-    } catch {
-      // Email failure should not block the forgot-password flow
+    } catch (err) {
+      this.logger.error(`Failed to send reset OTP email to ${user.email}`, err);
     }
 
     return { message: 'If this email exists, a reset OTP has been sent.' };

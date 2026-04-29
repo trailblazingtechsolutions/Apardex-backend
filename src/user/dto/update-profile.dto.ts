@@ -13,6 +13,16 @@ export class UpdateProfileDto {
   @IsOptional()
   phoneNumber?: string;
 
+  @ApiPropertyOptional({ example: 'Lagos, Nigeria' })
+  @IsString()
+  @IsOptional()
+  location?: string;
+
+  @ApiPropertyOptional({ example: 'I love travelling and trying new places.' })
+  @IsString()
+  @IsOptional()
+  bio?: string;
+
   @ApiPropertyOptional({
     type: 'string',
     format: 'binary',

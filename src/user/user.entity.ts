@@ -49,6 +49,12 @@ export class User {
   phoneNumber: string;
 
   @Column({ type: 'varchar', nullable: true })
+  location: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  bio: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
   avatarUrl: string | null;
 
   @CreateDateColumn()
