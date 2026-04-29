@@ -62,8 +62,10 @@ export class AuthService {
       otpExpiresAt: this.getOtpExpiry(),
     });
 
+    this.logger.log(`Sending OTP email to ${user.email}...`);
     try {
       await this.mailerService.sendOtp(user.email, user.fullName, otp);
+      this.logger.log(`OTP email sent successfully to ${user.email}`);
     } catch (err) {
       this.logger.error(`Failed to send OTP email to ${user.email}`, err);
     }
@@ -102,8 +104,10 @@ export class AuthService {
       documentUrl: uploadResult.secure_url,
     });
 
+    this.logger.log(`Sending OTP email to ${user.email}...`);
     try {
       await this.mailerService.sendOtp(user.email, user.fullName, otp);
+      this.logger.log(`OTP email sent successfully to ${user.email}`);
     } catch (err) {
       this.logger.error(`Failed to send OTP email to ${user.email}`, err);
     }
@@ -162,8 +166,10 @@ export class AuthService {
       otpExpiresAt: this.getOtpExpiry(),
     });
 
+    this.logger.log(`Resending OTP email to ${user.email}...`);
     try {
       await this.mailerService.sendOtp(user.email, user.fullName, otp);
+      this.logger.log(`OTP email resent successfully to ${user.email}`);
     } catch (err) {
       this.logger.error(`Failed to resend OTP email to ${user.email}`, err);
     }
@@ -182,8 +188,10 @@ export class AuthService {
       otpExpiresAt: this.getOtpExpiry(),
     });
 
+    this.logger.log(`Sending password reset OTP email to ${user.email}...`);
     try {
       await this.mailerService.sendPasswordResetOtp(user.email, user.fullName, otp);
+      this.logger.log(`Password reset OTP email sent successfully to ${user.email}`);
     } catch (err) {
       this.logger.error(`Failed to send reset OTP email to ${user.email}`, err);
     }

@@ -14,11 +14,12 @@ import { MailerService } from './mailer.service';
         transport: {
           host: config.get<string>('MAIL_HOST'),
           port: config.get<number>('MAIL_PORT', 587),
-          secure: false,
+          secure: config.get<number>('MAIL_PORT', 587) === 465,
           auth: {
             user: config.get<string>('MAIL_USER'),
             pass: config.get<string>('MAIL_PASSWORD'),
           },
+          tls: { rejectUnauthorized: false },
         },
         defaults: {
           from: `"Apardex" <${config.get<string>('MAIL_FROM')}>`,
