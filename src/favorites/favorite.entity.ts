@@ -14,22 +14,22 @@ import { Property } from '../property/property.entity';
 @Unique(['userId', 'propertyId'])
 export class Favorite {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'userId' })
-  user: User;
+  user!: User;
 
   @Column()
-  userId: string;
+  userId!: string;
 
   @ManyToOne(() => Property, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'propertyId' })
-  property: Property;
+  property!: Property;
 
   @Column()
-  propertyId: string;
+  propertyId!: string;
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 }

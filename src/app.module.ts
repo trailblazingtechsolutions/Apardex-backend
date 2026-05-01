@@ -14,6 +14,8 @@ import { ReviewModule } from './review/review.module';
 import { MessagingModule } from './messaging/messaging.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PaymentModule } from './payment/payment.module';
+import { HostModule } from './host/host.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -43,6 +45,7 @@ import { PaymentModule } from './payment/payment.module';
     }),
     AuthModule,
     UserModule,
+    HostModule,
     CloudinaryModule,
     MailerModule,
     PropertyModule,
@@ -52,6 +55,7 @@ import { PaymentModule } from './payment/payment.module';
     MessagingModule,
     NotificationsModule,
     PaymentModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],

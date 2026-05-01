@@ -17,9 +17,30 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: { sub: string; email: string; role: string }) {
+  async validate(payload: {
+    sub: string;
+    email: string;
+    role: string;
+    tokenVersion?: number;
+    sessionId?: string | null;
+  }) {
     const user = await this.userService.findById(payload.sub);
     if (!user) throw new UnauthorizedException();
+
+    if ((payload.tokenVersion ?? 0) !== user.tokenVersion) {
+      throw new UnauthorizedException('Session expired, please log in again');
+    }
+
+    if (payload.sessionId) {
+      const session = await this.userService.findActiveSession(payload.sessionId);
+      if (!session) {
+        throw new UnauthorizedException('Session expired, please log in again');
+      }
+      // fire-and-forget — don't block the request
+      void this.userService.touchSession(payload.sessionId);
+      user.currentSessionId = payload.sessionId;
+    }
+
     return user;
   }
 }

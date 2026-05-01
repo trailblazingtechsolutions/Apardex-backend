@@ -1,8 +1,11 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  Param,
   Patch,
+  Post,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -21,6 +24,10 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User } from './user.entity';
 import { ChangePasswordDto, UpdateProfileDto } from './dto/update-profile.dto';
+import { UpdatePreferencesDto } from './dto/preferences.dto';
+import { UpdateNotificationPreferencesDto } from './dto/notification-preferences.dto';
+import { BillingAddressDto } from './dto/billing-address.dto';
+import { SecuritySettingsDto } from './dto/security-settings.dto';
 
 @ApiTags('User')
 @ApiBearerAuth('access-token')
@@ -29,13 +36,10 @@ import { ChangePasswordDto, UpdateProfileDto } from './dto/update-profile.dto';
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
+  // ─── Profile ────────────────────────────────────────────────────────────────
+
   @Get('profile')
   @ApiOperation({ summary: 'Get current user profile' })
-  @ApiResponse({
-    status: 200,
-    description: 'Returns the logged-in user profile',
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
   getProfile(@CurrentUser() user: User) {
     return user;
   }
@@ -43,28 +47,28 @@ export class UserController {
   @Patch('profile')
   @UseInterceptors(FileInterceptor('avatar', { storage: memoryStorage() }))
   @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Update profile (fields + optional avatar image)' })
-  @ApiResponse({ status: 200, description: 'Profile updated successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiOperation({ summary: 'Update profile fields + optional avatar' })
   updateProfile(
     @CurrentUser() user: User,
     @Body() dto: UpdateProfileDto,
-    @UploadedFile()
-    file?: {
-      buffer: Buffer;
-      originalname: string;
-      mimetype: string;
-      size: number;
-    },
+    @UploadedFile() file?: Express.Multer.File,
   ) {
     return this.userService.updateWithAvatar(user.id, dto, file);
   }
+
+  @Delete('profile/avatar')
+  @ApiOperation({ summary: 'Remove profile avatar' })
+  @ApiResponse({ status: 200, description: 'Avatar removed' })
+  removeAvatar(@CurrentUser() user: User) {
+    return this.userService.removeAvatar(user.id);
+  }
+
+  // ─── Password ───────────────────────────────────────────────────────────────
 
   @Patch('change-password')
   @ApiOperation({ summary: 'Change account password' })
   @ApiResponse({ status: 200, description: 'Password changed successfully' })
   @ApiResponse({ status: 400, description: 'Current password is incorrect' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
   async changePassword(
     @CurrentUser() user: User,
     @Body() dto: ChangePasswordDto,
@@ -73,24 +77,115 @@ export class UserController {
     return { message: 'Password changed successfully' };
   }
 
+  // ─── Preferences ────────────────────────────────────────────────────────────
+
+  @Get('preferences')
+  @ApiOperation({ summary: 'Get user preferences' })
+  getPreferences(@CurrentUser() user: User) {
+    return this.userService.getPreferences(user.id);
+  }
+
+  @Patch('preferences')
+  @ApiOperation({ summary: 'Update user preferences' })
+  updatePreferences(
+    @CurrentUser() user: User,
+    @Body() dto: UpdatePreferencesDto,
+  ) {
+    return this.userService.updatePreferences(user.id, dto);
+  }
+
+  // ─── Notification Preferences ───────────────────────────────────────────────
+
+  @Get('notification-preferences')
+  @ApiOperation({ summary: 'Get notification preferences' })
+  getNotificationPreferences(@CurrentUser() user: User) {
+    return this.userService.getNotificationPreferences(user.id);
+  }
+
+  @Patch('notification-preferences')
+  @ApiOperation({ summary: 'Update notification preferences' })
+  updateNotificationPreferences(
+    @CurrentUser() user: User,
+    @Body() dto: UpdateNotificationPreferencesDto,
+  ) {
+    return this.userService.updateNotificationPreferences(user.id, dto);
+  }
+
+  // ─── Security Settings ──────────────────────────────────────────────────────
+
+  @Patch('security-settings')
+  @ApiOperation({ summary: 'Update security settings (2FA, login alerts)' })
+  updateSecuritySettings(
+    @CurrentUser() user: User,
+    @Body() dto: SecuritySettingsDto,
+  ) {
+    return this.userService.updateSecuritySettings(user.id, dto);
+  }
+
+  // ─── Billing Address ────────────────────────────────────────────────────────
+
+  @Get('billing-address')
+  @ApiOperation({ summary: 'Get billing address' })
+  getBillingAddress(@CurrentUser() user: User) {
+    return this.userService.getBillingAddress(user.id);
+  }
+
+  @Patch('billing-address')
+  @ApiOperation({ summary: 'Save billing address' })
+  updateBillingAddress(
+    @CurrentUser() user: User,
+    @Body() dto: BillingAddressDto,
+  ) {
+    return this.userService.updateBillingAddress(user.id, dto);
+  }
+
+  // ─── Account Lifecycle ──────────────────────────────────────────────────────
+
+  @Patch('deactivate')
+  @ApiOperation({ summary: 'Deactivate account (reversible)' })
+  @ApiResponse({ status: 200, description: 'Account deactivated' })
+  deactivateAccount(@CurrentUser() user: User) {
+    return this.userService.deactivateAccount(user.id);
+  }
+
+  @Delete('account')
+  @ApiOperation({ summary: 'Permanently delete account and all data' })
+  @ApiResponse({ status: 200, description: 'Account deleted' })
+  deleteAccount(@CurrentUser() user: User) {
+    return this.userService.deleteAccount(user.id);
+  }
+
+  // ─── Sessions ───────────────────────────────────────────────────────────────
+
+  @Get('sessions')
+  @ApiOperation({ summary: 'List active sessions (devices)' })
+  getSessions(@CurrentUser() user: User) {
+    return this.userService.getSessions(user.id);
+  }
+
+  @Delete('sessions/:id')
+  @ApiOperation({ summary: 'Revoke a specific session (log out that device)' })
+  revokeSession(@CurrentUser() user: User, @Param('id') id: string) {
+    return this.userService.revokeSession(user.id, id);
+  }
+
+  @Post('sessions/revoke-others')
+  @ApiOperation({ summary: 'Log out all other devices except the current one' })
+  revokeAllOtherSessions(@CurrentUser() user: User) {
+    const currentSessionId = user.currentSessionId ?? '';
+    return this.userService.revokeAllOtherSessions(user.id, currentSessionId);
+  }
+
+  // ─── Dashboards ─────────────────────────────────────────────────────────────
+
   @Get('dashboard')
   @ApiOperation({ summary: 'Get customer dashboard overview' })
-  @ApiResponse({
-    status: 200,
-    description:
-      'Stats (active bookings, saved properties, unread messages, new notifications), upcoming stay, recent messages, recently saved properties',
-  })
   getDashboard(@CurrentUser() user: User) {
     return this.userService.getDashboard(user.id);
   }
 
   @Get('host-dashboard')
-  @ApiOperation({ summary: 'Get host dashboard overview (Host only)' })
-  @ApiResponse({
-    status: 200,
-    description:
-      'Stats (listings, bookings, revenue, avg rating), upcoming check-ins, pending approvals, recent bookings',
-  })
+  @ApiOperation({ summary: 'Get host dashboard overview' })
   getHostDashboard(@CurrentUser() user: User) {
     return this.userService.getHostDashboard(user.id);
   }

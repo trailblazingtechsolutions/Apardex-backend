@@ -13,21 +13,21 @@ import { Property } from './property.entity';
 @Unique(['propertyId', 'date'])
 export class PropertyAvailability {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @ManyToOne(() => Property, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'propertyId' })
-  property: Property;
+  property!: Property;
 
   @Column()
-  propertyId: string;
+  propertyId!: string;
 
   @Column({ type: 'date' })
-  date: string;
+  date!: string;
 
   @Column({ type: 'varchar', nullable: true })
-  reason: string | null;
+  reason!: string | null;
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 }

@@ -1,0 +1,24 @@
+import { IsDateString, IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ReportOutputType } from '../entities/admin-report.entity';
+
+export class GenerateReportDto {
+  @ApiProperty({ example: 'Monthly Financial Summary' })
+  @IsString()
+  @IsNotEmpty()
+  name!: string;
+
+  @ApiProperty({ enum: ReportOutputType })
+  @IsEnum(ReportOutputType)
+  outputType!: ReportOutputType;
+
+  @ApiPropertyOptional({ example: '2024-10-01' })
+  @IsDateString()
+  @IsOptional()
+  dateRangeStart?: string;
+
+  @ApiPropertyOptional({ example: '2024-10-31' })
+  @IsDateString()
+  @IsOptional()
+  dateRangeEnd?: string;
+}

@@ -12,54 +12,104 @@ export enum UserRole {
   ADMIN = 'admin',
 }
 
+export enum KycStatus {
+  PENDING = 'pending',
+  UNDER_REVIEW = 'under_review',
+  APPROVED = 'approved',
+  REJECTED = 'rejected',
+  FLAGGED = 'flagged',
+}
+
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
+
+  @Column({ type: 'varchar', unique: true, nullable: true })
+  hostCode!: string | null;
 
   @Column({ nullable: true })
-  fullName: string;
+  firstName!: string;
+
+  @Column({ nullable: true })
+  lastName!: string;
 
   @Column({ unique: true })
-  email: string;
+  email!: string;
 
   @Column({ select: false })
-  password: string;
+  password!: string;
 
   @Column({ type: 'enum', enum: UserRole, default: UserRole.USER })
-  role: UserRole;
+  role!: UserRole;
 
   @Column({ default: false })
-  isEmailVerified: boolean;
+  isEmailVerified!: boolean;
 
   @Column({ type: 'varchar', nullable: true })
-  otp: string | null;
+  otp!: string | null;
 
   @Column({ type: 'timestamp', nullable: true })
-  otpExpiresAt: Date | null;
+  otpExpiresAt!: Date | null;
 
   // Host-specific fields
   @Column({ nullable: true })
-  documentUrl: string;
+  documentUrl!: string;
 
   @Column({ default: false })
-  isDocumentVerified: boolean;
+  isDocumentVerified!: boolean;
+
+  @Column({
+    type: 'enum',
+    enum: KycStatus,
+    default: KycStatus.PENDING,
+  })
+  kycStatus!: KycStatus;
 
   @Column({ nullable: true })
-  phoneNumber: string;
+  phoneNumber!: string;
 
   @Column({ type: 'varchar', nullable: true })
-  location: string | null;
+  location!: string | null;
 
   @Column({ type: 'text', nullable: true })
-  bio: string | null;
+  bio!: string | null;
 
   @Column({ type: 'varchar', nullable: true })
-  avatarUrl: string | null;
+  avatarUrl!: string | null;
+
+  // Account status
+  @Column({ default: true })
+  isActive!: boolean;
+
+  // Security settings
+  @Column({ default: false })
+  isTwoFactorEnabled!: boolean;
+
+  @Column({ default: true })
+  isLoginAlertsEnabled!: boolean;
+
+  // Billing address
+  @Column({ type: 'jsonb', nullable: true })
+  billingAddress!: {
+    firstName: string;
+    lastName: string;
+    street: string;
+    city: string;
+    state: string;
+    postalCode: string;
+    country: string;
+  } | null;
+
+  @Column({ default: 0 })
+  tokenVersion!: number;
+
+  // Transient — set by JwtStrategy after validation, never persisted
+  currentSessionId?: string;
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+  updatedAt!: Date;
 }

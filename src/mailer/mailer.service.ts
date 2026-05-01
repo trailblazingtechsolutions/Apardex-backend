@@ -5,25 +5,25 @@ import { MailerService as NestMailerService } from '@nestjs-modules/mailer';
 export class MailerService {
   constructor(private readonly mailer: NestMailerService) {}
 
-  async sendOtp(email: string, fullName: string, otp: string): Promise<void> {
+  async sendOtp(email: string, firstName: string, otp: string): Promise<void> {
     await this.mailer.sendMail({
       to: email,
       subject: 'Verify your Apardex account',
       template: 'otp',
-      context: { fullName, otp },
+      context: { firstName, otp },
     });
   }
 
   async sendPasswordResetOtp(
     email: string,
-    fullName: string,
+    firstName: string,
     otp: string,
   ): Promise<void> {
     await this.mailer.sendMail({
       to: email,
       subject: 'Reset your Apardex password',
       template: 'reset-password',
-      context: { fullName, otp },
+      context: { firstName, otp },
     });
   }
 }

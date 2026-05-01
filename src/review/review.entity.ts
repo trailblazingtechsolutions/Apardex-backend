@@ -14,38 +14,38 @@ import { Booking } from '../booking/booking.entity';
 @Entity('reviews')
 export class Review {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @ManyToOne(() => User, { eager: true, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'userId' })
-  user: User;
+  user!: User;
 
   @Column()
-  userId: string;
+  userId!: string;
 
   @ManyToOne(() => Property, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'propertyId' })
-  property: Property;
+  property!: Property;
 
   @Column()
-  propertyId: string;
+  propertyId!: string;
 
   @ManyToOne(() => Booking, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'bookingId' })
-  booking: Booking;
+  booking!: Booking;
 
   @Column()
-  bookingId: string;
+  bookingId!: string;
 
   @Column({ type: 'int' })
-  rating: number;
+  rating!: number;
 
   @Column({ type: 'text' })
-  comment: string;
+  comment!: string;
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+  updatedAt!: Date;
 }

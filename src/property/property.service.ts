@@ -24,8 +24,16 @@ export class PropertyService {
     private readonly cloudinaryService: CloudinaryService,
   ) {}
 
+  private generatePropertyCode(): string {
+    return `PRO-${Math.floor(100000 + Math.random() * 900000)}`;
+  }
+
   async create(hostId: string, dto: CreatePropertyDto): Promise<Property> {
-    const property = this.propertyRepository.create({ ...dto, hostId });
+    const property = this.propertyRepository.create({
+      ...dto,
+      hostId,
+      propertyCode: this.generatePropertyCode(),
+    });
     return this.propertyRepository.save(property);
   }
 

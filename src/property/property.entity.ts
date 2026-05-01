@@ -28,115 +28,119 @@ export enum PropertyStatus {
   ACTIVE = 'active',
   INACTIVE = 'inactive',
   PENDING = 'pending',
+  SUSPENDED = 'suspended',
 }
 
 @Entity('properties')
 export class Property {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
+
+  @Column({ unique: true })
+  propertyCode!: string;
 
   @Column()
-  title: string;
+  title!: string;
 
   @Column({ type: 'text' })
-  description: string;
+  description!: string;
 
   @Column({ type: 'enum', enum: PropertyType })
-  type: PropertyType;
+  type!: PropertyType;
 
   @Column()
-  address: string;
+  address!: string;
 
   @Column()
-  city: string;
+  city!: string;
 
   @Column()
-  state: string;
+  state!: string;
 
   @Column()
-  country: string;
+  country!: string;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
-  pricePerNight: number;
+  pricePerNight!: number;
 
   @Column({ type: 'decimal', precision: 5, scale: 2, default: 0 })
-  discountPercentage: number;
+  discountPercentage!: number;
 
   @Column({ type: 'int' })
-  maxGuests: number;
+  maxGuests!: number;
 
   @Column({ type: 'int' })
-  bedrooms: number;
+  bedrooms!: number;
 
   @Column({ type: 'int' })
-  bathrooms: number;
+  bathrooms!: number;
 
   @Column({ type: 'simple-array', nullable: true })
-  amenities: string[];
+  amenities!: string[];
 
   @Column({ type: 'simple-array', nullable: true })
-  images: string[];
+  images!: string[];
 
   @Column({ type: 'simple-array', nullable: true })
-  houseRules: string[];
+  houseRules!: string[];
 
   @Column({
     type: 'enum',
     enum: CancellationPolicy,
     default: CancellationPolicy.MODERATE,
   })
-  cancellationPolicy: CancellationPolicy;
+  cancellationPolicy!: CancellationPolicy;
 
   @Column({ default: '14:00' })
-  checkInTime: string;
+  checkInTime!: string;
 
   @Column({ default: '11:00' })
-  checkOutTime: string;
+  checkOutTime!: string;
 
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
-  cleaningFee: number;
+  cleaningFee!: number;
 
   @Column({ type: 'decimal', precision: 5, scale: 2, default: 0 })
-  serviceFeePercentage: number;
+  serviceFeePercentage!: number;
 
   @Column({ type: 'decimal', precision: 5, scale: 2, default: 0 })
-  taxPercentage: number;
+  taxPercentage!: number;
 
   @Column({ type: 'decimal', precision: 10, scale: 6, nullable: true })
-  latitude: number | null;
+  latitude!: number | null;
 
   @Column({ type: 'decimal', precision: 10, scale: 6, nullable: true })
-  longitude: number | null;
+  longitude!: number | null;
 
   @Column({ type: 'varchar', nullable: true })
-  coverImage: string | null;
+  coverImage!: string | null;
 
   @Column({ default: false })
-  instantBook: boolean;
+  instantBook!: boolean;
 
   @Column({
     type: 'enum',
     enum: PropertyStatus,
     default: PropertyStatus.PENDING,
   })
-  status: PropertyStatus;
+  status!: PropertyStatus;
 
   @Column({ type: 'decimal', precision: 3, scale: 2, default: 0 })
-  avgRating: number;
+  avgRating!: number;
 
   @Column({ type: 'int', default: 0 })
-  totalReviews: number;
+  totalReviews!: number;
 
   @ManyToOne(() => User, { eager: true })
   @JoinColumn({ name: 'hostId' })
-  host: User;
+  host!: User;
 
   @Column()
-  hostId: string;
+  hostId!: string;
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+  updatedAt!: Date;
 }

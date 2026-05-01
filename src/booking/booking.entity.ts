@@ -22,71 +22,71 @@ export enum BookingStatus {
 @Entity('bookings')
 export class Booking {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @ManyToOne(() => User, { eager: true, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'userId' })
-  user: User;
+  user!: User;
 
   @Column()
-  userId: string;
+  userId!: string;
 
   @ManyToOne(() => Property, { eager: true, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'propertyId' })
-  property: Property;
+  property!: Property;
 
   @Column()
-  propertyId: string;
+  propertyId!: string;
 
   @Column({ type: 'date' })
-  checkIn: string;
+  checkIn!: string;
 
   @Column({ type: 'date' })
-  checkOut: string;
+  checkOut!: string;
 
   @Column({ type: 'int' })
-  guests: number;
+  guests!: number;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
-  basePrice: number;
+  basePrice!: number;
 
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
-  cleaningFee: number;
+  cleaningFee!: number;
 
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
-  serviceFee: number;
+  serviceFee!: number;
 
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
-  tax: number;
+  tax!: number;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
-  totalPrice: number;
+  totalPrice!: number;
 
   @Column({ type: 'int' })
-  nights: number;
+  nights!: number;
 
   @Column({
     type: 'enum',
     enum: BookingStatus,
     default: BookingStatus.PENDING,
   })
-  status: BookingStatus;
+  status!: BookingStatus;
 
   @Column({ type: 'varchar', nullable: true })
-  cancellationReason: string | null;
+  cancellationReason!: string | null;
 
   @Column({ default: false })
-  isPaid: boolean;
+  isPaid!: boolean;
 
   @Column({ type: 'varchar', nullable: true })
-  paymentReference: string | null;
+  paymentReference!: string | null;
 
   @Column({ type: 'enum', enum: PaymentProviderName, nullable: true })
-  paymentProvider: PaymentProviderName | null;
+  paymentProvider!: PaymentProviderName | null;
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+  updatedAt!: Date;
 }

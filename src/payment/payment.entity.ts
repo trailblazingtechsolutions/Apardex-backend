@@ -18,39 +18,39 @@ export enum PaymentStatus {
 @Entity('payments')
 export class Payment {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @Column()
-  bookingId: string;
+  bookingId!: string;
 
   @Column()
-  userId: string;
+  userId!: string;
 
   @Column({ type: 'enum', enum: PaymentProviderName })
-  provider: PaymentProviderName;
+  provider!: PaymentProviderName;
 
   @Column()
-  currency: string;
+  currency!: string;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
-  amount: number;
+  amount!: number;
 
   @Column({ unique: true })
-  reference: string;
+  reference!: string;
 
   @Column({
     type: 'enum',
     enum: PaymentStatus,
     default: PaymentStatus.PENDING,
   })
-  status: PaymentStatus;
+  status!: PaymentStatus;
 
   @Column({ type: 'jsonb', nullable: true })
-  metadata: object | null;
+  metadata!: object | null;
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+  updatedAt!: Date;
 }

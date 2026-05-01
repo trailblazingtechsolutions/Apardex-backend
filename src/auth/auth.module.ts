@@ -3,7 +3,11 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
-import { UserAuthController, HostAuthController } from './auth.controller';
+import {
+  UserAuthController,
+  HostAuthController,
+  AdminAuthController,
+} from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { UserModule } from '../user/user.module';
 import { MailerModule } from '../mailer/mailer.module';
@@ -24,7 +28,7 @@ import { CloudinaryModule } from '../cloudinary/cloudinary.module';
       }),
     }),
   ],
-  controllers: [UserAuthController, HostAuthController],
+  controllers: [UserAuthController, HostAuthController, AdminAuthController],
   providers: [AuthService, JwtStrategy],
   exports: [AuthService],
 })

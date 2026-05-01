@@ -9,10 +9,23 @@ import { Message } from '../messaging/message.entity';
 import { Notification } from '../notifications/notification.entity';
 import { Property } from '../property/property.entity';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
+import { UserPreferences } from './entities/user-preferences.entity';
+import { UserNotificationPreferences } from './entities/user-notification-preferences.entity';
+import { UserSession } from './entities/user-session.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Booking, Favorite, Message, Notification, Property]),
+    TypeOrmModule.forFeature([
+      User,
+      Booking,
+      Favorite,
+      Message,
+      Notification,
+      Property,
+      UserPreferences,
+      UserNotificationPreferences,
+      UserSession,
+    ]),
     CloudinaryModule,
   ],
   controllers: [UserController],

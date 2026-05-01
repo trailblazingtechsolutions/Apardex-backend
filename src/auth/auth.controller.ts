@@ -2,10 +2,12 @@ import {
   Body,
   Controller,
   Post,
+  Req,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import {
@@ -49,8 +51,14 @@ export class UserAuthController {
   @ApiOperation({ summary: 'User login' })
   @ApiResponse({ status: 200, description: 'Returns access token' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto, UserRole.USER);
+  login(@Body() dto: LoginDto, @Req() req: Request) {
+    const ip =
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ??
+      req.ip;
+    return this.authService.login(dto, UserRole.USER, {
+      ip,
+      userAgent: req.headers['user-agent'],
+    });
   }
 
   @Post('verify-email')
@@ -132,8 +140,14 @@ export class HostAuthController {
   @ApiOperation({ summary: 'Host login' })
   @ApiResponse({ status: 200, description: 'Returns access token' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto, UserRole.HOST);
+  login(@Body() dto: LoginDto, @Req() req: Request) {
+    const ip =
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ??
+      req.ip;
+    return this.authService.login(dto, UserRole.HOST, {
+      ip,
+      userAgent: req.headers['user-agent'],
+    });
   }
 
   @Post('verify-email')
@@ -207,5 +221,39 @@ export class HostAuthController {
       message: 'Document uploaded successfully',
       url: result.secure_url,
     };
+  }
+}
+
+// ─── Admin Auth ───────────────────────────────────────────────────────────────
+
+@ApiTags('Admin Auth')
+@Controller('auth/admin')
+export class AdminAuthController {
+  constructor(private readonly authService: AuthService) {}
+
+  @Post('login')
+  @ApiOperation({ summary: 'Admin login' })
+  @ApiResponse({ status: 200, description: 'Returns access token' })
+  @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  login(@Body() dto: LoginDto, @Req() req: Request) {
+    const ip =
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ??
+      req.ip;
+    return this.authService.login(dto, UserRole.ADMIN, {
+      ip,
+      userAgent: req.headers['user-agent'],
+    });
+  }
+
+  @Post('forgot-password')
+  @ApiOperation({ summary: 'Request admin password reset OTP' })
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto);
+  }
+
+  @Post('reset-password')
+  @ApiOperation({ summary: 'Reset admin password using OTP' })
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto);
   }
 }

@@ -33,17 +33,23 @@ export class AuthService {
     return Math.floor(1000 + Math.random() * 9000).toString();
   }
 
+  private generateHostCode(): string {
+    return `HST-${Math.floor(100000 + Math.random() * 900000)}`;
+  }
+
   private getOtpExpiry(): Date {
     const expiry = new Date();
     expiry.setMinutes(expiry.getMinutes() + 10);
     return expiry;
   }
 
-  private generateToken(user: User): string {
+  private generateToken(user: User, sessionId?: string): string {
     return this.jwtService.sign({
       sub: user.id,
       email: user.email,
       role: user.role,
+      tokenVersion: user.tokenVersion ?? 0,
+      sessionId: sessionId ?? null,
     });
   }
 
@@ -51,11 +57,12 @@ export class AuthService {
     const existing = await this.userService.findByEmail(dto.email);
     if (existing) throw new ConflictException('Email already in use');
 
-    const hashedPassword = await bcrypt.hash(dto.password, 10);
+    const hashedPassword = await bcrypt.hash(dto.password, 8);
     const otp = this.generateOtp();
 
     const user = await this.userService.create({
       ...dto,
+      firstName: dto.fullName,
       password: hashedPassword,
       role: UserRole.USER,
       otp,
@@ -64,7 +71,7 @@ export class AuthService {
 
     this.logger.log(`Sending OTP email to ${user.email}...`);
     try {
-      await this.mailerService.sendOtp(user.email, user.fullName, otp);
+      await this.mailerService.sendOtp(user.email, user.firstName, otp);
       this.logger.log(`OTP email sent successfully to ${user.email}`);
     } catch (err) {
       this.logger.error(`Failed to send OTP email to ${user.email}`, err);
@@ -92,21 +99,23 @@ export class AuthService {
       'host-documents',
     );
 
-    const hashedPassword = await bcrypt.hash(dto.password, 10);
+    const hashedPassword = await bcrypt.hash(dto.password, 8);
     const otp = this.generateOtp();
 
     const user = await this.userService.create({
       ...dto,
+      firstName: dto.fullName,
       password: hashedPassword,
       role: UserRole.HOST,
       otp,
       otpExpiresAt: this.getOtpExpiry(),
       documentUrl: uploadResult.secure_url,
+      hostCode: this.generateHostCode(),
     });
 
     this.logger.log(`Sending OTP email to ${user.email}...`);
     try {
-      await this.mailerService.sendOtp(user.email, user.fullName, otp);
+      await this.mailerService.sendOtp(user.email, user.firstName, otp);
       this.logger.log(`OTP email sent successfully to ${user.email}`);
     } catch (err) {
       this.logger.error(`Failed to send OTP email to ${user.email}`, err);
@@ -134,7 +143,11 @@ export class AuthService {
     return { message: 'Email verified successfully' };
   }
 
-  async login(dto: LoginDto, expectedRole: UserRole) {
+  async login(
+    dto: LoginDto,
+    expectedRole: UserRole,
+    meta: { ip?: string; userAgent?: string } = {},
+  ) {
     const user = await this.userService.findByEmailWithPassword(dto.email);
     if (!user) throw new UnauthorizedException('Invalid credentials');
 
@@ -149,7 +162,8 @@ export class AuthService {
         'Please verify your email before logging in',
       );
 
-    const token = this.generateToken(user);
+    const session = await this.userService.createSession(user.id, meta);
+    const token = this.generateToken(user, session.id);
     return { accessToken: token };
   }
 
@@ -168,7 +182,7 @@ export class AuthService {
 
     this.logger.log(`Resending OTP email to ${user.email}...`);
     try {
-      await this.mailerService.sendOtp(user.email, user.fullName, otp);
+      await this.mailerService.sendOtp(user.email, user.firstName, otp);
       this.logger.log(`OTP email resent successfully to ${user.email}`);
     } catch (err) {
       this.logger.error(`Failed to resend OTP email to ${user.email}`, err);
@@ -190,7 +204,7 @@ export class AuthService {
 
     this.logger.log(`Sending password reset OTP email to ${user.email}...`);
     try {
-      await this.mailerService.sendPasswordResetOtp(user.email, user.fullName, otp);
+      await this.mailerService.sendPasswordResetOtp(user.email, user.firstName, otp);
       this.logger.log(`Password reset OTP email sent successfully to ${user.email}`);
     } catch (err) {
       this.logger.error(`Failed to send reset OTP email to ${user.email}`, err);
@@ -207,7 +221,7 @@ export class AuthService {
     if (!user.otpExpiresAt || new Date() > user.otpExpiresAt)
       throw new BadRequestException('OTP has expired');
 
-    const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
+    const hashedPassword = await bcrypt.hash(dto.newPassword, 8);
     await this.userService.update(user.id, {
       password: hashedPassword,
       otp: null,

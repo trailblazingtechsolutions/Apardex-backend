@@ -12,35 +12,35 @@ import { Property } from '../property/property.entity';
 @Entity('messages')
 export class Message {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @ManyToOne(() => User, { eager: true, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'senderId' })
-  sender: User;
+  sender!: User;
 
   @Column()
-  senderId: string;
+  senderId!: string;
 
   @ManyToOne(() => User, { eager: true, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'receiverId' })
-  receiver: User;
+  receiver!: User;
 
   @Column()
-  receiverId: string;
+  receiverId!: string;
 
   @ManyToOne(() => Property, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'propertyId' })
-  property: Property;
+  property!: Property;
 
   @Column({ type: 'varchar', nullable: true })
-  propertyId: string | null;
+  propertyId!: string | null;
 
   @Column({ type: 'text' })
-  content: string;
+  content!: string;
 
   @Column({ default: false })
-  isRead: boolean;
+  isRead!: boolean;
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 }

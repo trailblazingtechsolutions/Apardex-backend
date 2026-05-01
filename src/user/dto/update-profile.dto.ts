@@ -3,10 +3,15 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import 'multer';
 
 export class UpdateProfileDto {
-  @ApiPropertyOptional({ example: 'John Doe' })
+  @ApiPropertyOptional({ example: 'John' })
   @IsString()
   @IsOptional()
-  fullName?: string;
+  firstName?: string;
+
+  @ApiPropertyOptional({ example: 'Doe' })
+  @IsString()
+  @IsOptional()
+  lastName?: string;
 
   @ApiPropertyOptional({ example: '+2348012345678' })
   @IsString()
@@ -23,17 +28,8 @@ export class UpdateProfileDto {
   @IsOptional()
   bio?: string;
 
-  @ApiPropertyOptional({
-    type: 'string',
-    format: 'binary',
-    description: 'Profile avatar image',
-  })
-  avatar?: {
-    buffer: Buffer;
-    originalname: string;
-    mimetype: string;
-    size: number;
-  };
+  @ApiPropertyOptional({ type: 'string', format: 'binary' })
+  avatar?: Express.Multer.File;
 }
 
 export class ChangePasswordDto {
