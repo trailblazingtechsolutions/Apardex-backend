@@ -2,13 +2,20 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
+  ManyToOne,
+  JoinColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { User } from '../../user/user.entity';
 
 @Entity('host_preferences')
 export class HostPreferences {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
+
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'hostId' })
+  host!: User;
 
   @Column({ unique: true })
   hostId!: string;

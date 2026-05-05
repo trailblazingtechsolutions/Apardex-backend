@@ -131,7 +131,7 @@ export class Property {
   @Column({ type: 'int', default: 0 })
   totalReviews!: number;
 
-  @ManyToOne(() => User, { eager: true })
+  @ManyToOne(() => User, { eager: true, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'hostId' })
   host!: User;
 

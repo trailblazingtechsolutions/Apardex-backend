@@ -2,8 +2,11 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
+  ManyToOne,
+  JoinColumn,
   CreateDateColumn,
 } from 'typeorm';
+import { User } from '../../user/user.entity';
 
 export enum HostPayoutStatus {
   PROCESSING = 'processing',
@@ -15,6 +18,10 @@ export enum HostPayoutStatus {
 export class HostPayout {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
+
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'hostId' })
+  host!: User;
 
   @Column()
   hostId!: string;

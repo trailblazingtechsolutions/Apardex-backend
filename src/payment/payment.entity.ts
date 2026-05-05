@@ -2,9 +2,13 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
+  ManyToOne,
+  JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { User } from '../user/user.entity';
+import { Booking } from '../booking/booking.entity';
 import { PaymentProviderName } from './payment-provider.types';
 
 export { PaymentProviderName };
@@ -20,8 +24,16 @@ export class Payment {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
+  @ManyToOne(() => Booking, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'bookingId' })
+  booking!: Booking;
+
   @Column()
   bookingId!: string;
+
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'userId' })
+  user!: User;
 
   @Column()
   userId!: string;

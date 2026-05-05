@@ -1,4 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+  CreateDateColumn,
+} from 'typeorm';
+import { User } from '../../user/user.entity';
 
 export enum PayoutMethodType {
   BANK_ACCOUNT = 'bank_account',
@@ -10,13 +18,16 @@ export class HostPayoutMethod {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'hostId' })
+  host!: User;
+
   @Column()
   hostId!: string;
 
   @Column({ type: 'enum', enum: PayoutMethodType })
   type!: PayoutMethodType;
 
-  // Bank account fields
   @Column({ type: 'varchar', nullable: true })
   bankName!: string | null;
 
@@ -29,7 +40,6 @@ export class HostPayoutMethod {
   @Column({ type: 'varchar', nullable: true })
   accountName!: string | null;
 
-  // Wallet fields
   @Column({ type: 'varchar', nullable: true })
   walletEmail!: string | null;
 
