@@ -8,6 +8,9 @@ import { Payment } from '../payment/payment.entity';
 import { HostPayout } from '../host/entities/host-payout.entity';
 import { Dispute } from './entities/dispute.entity';
 import { AdminReport } from './entities/admin-report.entity';
+import { HostDocument } from '../host/entities/host-document.entity';
+import { DisputeLog } from './entities/dispute-log.entity';
+import { AdminNotificationPreferences } from './entities/admin-notification-preferences.entity';
 import { AdminService } from './admin.service';
 import { AdminController } from './admin.controller';
 
@@ -22,6 +25,9 @@ import { AdminController } from './admin.controller';
       HostPayout,
       Dispute,
       AdminReport,
+      HostDocument,
+      DisputeLog,
+      AdminNotificationPreferences,
     ]),
   ],
   controllers: [AdminController],

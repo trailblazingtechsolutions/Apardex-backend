@@ -20,6 +20,13 @@ export enum KycStatus {
   FLAGGED = 'flagged',
 }
 
+export enum AdminRole {
+  SUPER_ADMIN = 'super_admin',
+  FINANCIAL_OFFICER = 'financial_officer',
+  KYC_REVIEWER = 'kyc_reviewer',
+  SUPPORT_AGENT = 'support_agent',
+}
+
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn('uuid')
@@ -42,6 +49,9 @@ export class User {
 
   @Column({ type: 'enum', enum: UserRole, default: UserRole.USER })
   role!: UserRole;
+
+  @Column({ type: 'enum', enum: AdminRole, nullable: true })
+  adminRole!: AdminRole | null;
 
   @Column({ default: false })
   isEmailVerified!: boolean;

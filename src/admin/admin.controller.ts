@@ -23,7 +23,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { User, UserRole } from '../user/user.entity';
+import { User, UserRole, AdminRole } from '../user/user.entity';
 import { KycStatus } from '../user/user.entity';
 import { PropertyFiltersDto } from './dto/property-filters.dto';
 import { BookingFiltersDto } from './dto/booking-filters.dto';
@@ -32,8 +32,11 @@ import { KycActionDto } from './dto/kyc-action.dto';
 import {
   CreateDisputeDto,
   DisputeFiltersDto,
+  IssueRefundDto,
   ResolveDisputeDto,
 } from './dto/dispute.dto';
+import { InviteTeamMemberDto, UpdateTeamMemberRoleDto } from './dto/team.dto';
+import { UpdateAdminNotificationPreferencesDto } from './dto/admin-notification-preferences.dto';
 import { PayoutFiltersDto, CreatePayoutDto } from './dto/payout-filters.dto';
 import { GenerateReportDto } from './dto/report.dto';
 import { HostPayoutStatus } from '../host/entities/host-payout.entity';
@@ -66,6 +69,7 @@ export class AdminController {
       body.password,
       body.firstName,
       body.lastName,
+      AdminRole.SUPER_ADMIN,
     );
   }
 
@@ -324,5 +328,87 @@ export class AdminController {
   @ApiOperation({ summary: 'Generate a new report' })
   generateReport(@CurrentUser() user: User, @Body() dto: GenerateReportDto) {
     return this.adminService.generateReport(user.id, dto);
+  }
+
+  @Get('disputes/:id/log')
+  @ApiOperation({ summary: 'Get dispute audit log' })
+  getDisputeLog(@Param('id') id: string) {
+    return this.adminService.getDisputeLog(id);
+  }
+
+  @Post('disputes/:id/refund/full')
+  @ApiOperation({ summary: 'Issue a full refund and resolve dispute' })
+  issueFullRefund(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @Body() dto: IssueRefundDto,
+  ) {
+    return this.adminService.issueFullRefund(id, user.id, dto);
+  }
+
+  @Post('disputes/:id/refund/partial')
+  @ApiOperation({ summary: 'Issue a partial refund and resolve dispute' })
+  issuePartialRefund(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @Body() dto: IssueRefundDto,
+  ) {
+    return this.adminService.issuePartialRefund(id, user.id, dto);
+  }
+
+  @Get('settings/team')
+  @ApiOperation({ summary: 'List all admin team members' })
+  getTeamMembers() {
+    return this.adminService.getTeamMembers();
+  }
+
+  @Post('settings/team/invite')
+  @ApiOperation({ summary: 'Invite a new admin team member' })
+  inviteTeamMember(@Body() dto: InviteTeamMemberDto) {
+    return this.adminService.inviteTeamMember(dto);
+  }
+
+  @Patch('settings/team/:id/role')
+  @ApiOperation({ summary: 'Update a team member sub-role' })
+  updateTeamMemberRole(
+    @Param('id') id: string,
+    @Body() dto: UpdateTeamMemberRoleDto,
+  ) {
+    return this.adminService.updateTeamMemberRole(id, dto);
+  }
+
+  @Delete('settings/team/:id')
+  @ApiOperation({ summary: 'Remove a team member' })
+  removeTeamMember(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.adminService.removeTeamMember(id, user.id);
+  }
+
+  @Get('kyc/:hostId/documents')
+  @ApiOperation({ summary: 'View uploaded KYC documents for a host' })
+  getHostDocuments(@Param('hostId') hostId: string) {
+    return this.adminService.getHostDocuments(hostId);
+  }
+
+  @Get('payouts/:id/dispute')
+  @ApiOperation({ summary: 'Get dispute linked to a payout' })
+  getDisputeByPayout(@Param('id') id: string) {
+    return this.adminService.getDisputeByPayout(id);
+  }
+
+  // ─── Admin Notification Preferences ──────────────────────────────────────────
+
+  @Get('settings/notifications')
+  @ApiOperation({ summary: 'Get admin notification preferences' })
+  getAdminNotificationPreferences(@CurrentUser() user: User) {
+    return this.adminService.getAdminNotificationPreferences(user.id);
+  }
+
+  @Patch('settings/notifications')
+  @ApiOperation({ summary: 'Update admin notification preferences' })
+  updateAdminNotificationPreferences(
+    @CurrentUser() user: User,
+    @Body() dto: UpdateAdminNotificationPreferencesDto,
+  ) {
+    return this.adminService.updateAdminNotificationPreferences(user.id, dto);
   }
 }

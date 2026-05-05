@@ -72,6 +72,12 @@ export class Dispute {
   @Column({ type: 'timestamp', nullable: true })
   resolvedAt!: Date | null;
 
+  @Column({ type: 'varchar', nullable: true })
+  payoutId!: string | null;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  refundAmount!: number | null;
+
   @CreateDateColumn()
   createdAt!: Date;
 

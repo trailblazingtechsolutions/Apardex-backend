@@ -1,4 +1,4 @@
-import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   DisputePriority,
@@ -54,6 +54,17 @@ export class RefundDto {
   amount!: number;
 
   @ApiPropertyOptional({ example: 'Partial refund for cleaning issue' })
+  @IsString()
+  @IsOptional()
+  reason?: string;
+}
+
+export class IssueRefundDto {
+  @ApiPropertyOptional({ example: 150.00, description: 'Omit for full refund' })
+  @IsOptional()
+  amount?: number;
+
+  @ApiPropertyOptional({ example: 'Property condition misrepresented' })
   @IsString()
   @IsOptional()
   reason?: string;

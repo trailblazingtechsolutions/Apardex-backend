@@ -6,12 +6,15 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
-import { User, UserRole, KycStatus } from '../user/user.entity';
+import { randomBytes } from 'crypto';
+import { User, UserRole, KycStatus, AdminRole } from '../user/user.entity';
 import { Property, PropertyStatus } from '../property/property.entity';
 import { Booking, BookingStatus } from '../booking/booking.entity';
 import { Payment } from '../payment/payment.entity';
 import { HostPayout, HostPayoutStatus } from '../host/entities/host-payout.entity';
 import { Dispute, DisputeStatus } from './entities/dispute.entity';
+import { DisputeLog, DisputeLogAction } from './entities/dispute-log.entity';
+import { HostDocument } from '../host/entities/host-document.entity';
 import { AdminReport, ReportStatus } from './entities/admin-report.entity';
 import { PropertyFiltersDto } from './dto/property-filters.dto';
 import { BookingFiltersDto } from './dto/booking-filters.dto';
@@ -20,8 +23,12 @@ import { KycActionDto } from './dto/kyc-action.dto';
 import {
   CreateDisputeDto,
   DisputeFiltersDto,
+  IssueRefundDto,
   ResolveDisputeDto,
 } from './dto/dispute.dto';
+import { InviteTeamMemberDto, UpdateTeamMemberRoleDto } from './dto/team.dto';
+import { UpdateAdminNotificationPreferencesDto } from './dto/admin-notification-preferences.dto';
+import { AdminNotificationPreferences } from './entities/admin-notification-preferences.entity';
 import { PayoutFiltersDto, CreatePayoutDto } from './dto/payout-filters.dto';
 import { GenerateReportDto } from './dto/report.dto';
 
@@ -42,6 +49,12 @@ export class AdminService {
     private readonly disputeRepo: Repository<Dispute>,
     @InjectRepository(AdminReport)
     private readonly reportRepo: Repository<AdminReport>,
+    @InjectRepository(DisputeLog)
+    private readonly disputeLogRepo: Repository<DisputeLog>,
+    @InjectRepository(HostDocument)
+    private readonly hostDocumentRepo: Repository<HostDocument>,
+    @InjectRepository(AdminNotificationPreferences)
+    private readonly adminNotifPrefsRepo: Repository<AdminNotificationPreferences>,
   ) {}
 
   // ─── Seed / Bootstrap ────────────────────────────────────────────────────────
@@ -51,6 +64,7 @@ export class AdminService {
     password: string,
     firstName: string,
     lastName: string,
+    adminRole: AdminRole = AdminRole.SUPER_ADMIN,
   ): Promise<User> {
     const existing = await this.userRepo.findOne({ where: { email } });
     if (existing) throw new ConflictException('Email already in use');
@@ -62,6 +76,7 @@ export class AdminService {
         firstName,
         lastName,
         role: UserRole.ADMIN,
+        adminRole,
         isEmailVerified: true,
         kycStatus: KycStatus.APPROVED,
       }),
@@ -507,12 +522,15 @@ export class AdminService {
       reportedById,
       ticketId: this.generateTicketId(),
     });
-    return this.disputeRepo.save(dispute);
+    const saved = await this.disputeRepo.save(dispute);
+    await this.logDisputeAction(saved.id, DisputeLogAction.CREATED, reportedById);
+    return saved;
   }
 
   async setDisputeUnderReview(id: string) {
     await this.assertDispute(id);
     await this.disputeRepo.update(id, { status: DisputeStatus.IN_REVIEW });
+    await this.logDisputeAction(id, DisputeLogAction.SET_UNDER_REVIEW, null);
     return { message: 'Dispute set to in review' };
   }
 
@@ -523,6 +541,7 @@ export class AdminService {
       resolution: dto.resolution ?? null,
       resolvedAt: new Date(),
     });
+    await this.logDisputeAction(id, DisputeLogAction.RESOLVED, null, dto.resolution);
     return { message: 'Dispute resolved' };
   }
 
@@ -533,12 +552,14 @@ export class AdminService {
       resolution: dto.resolution ?? null,
       resolvedAt: new Date(),
     });
+    await this.logDisputeAction(id, DisputeLogAction.DISMISSED, null, dto.resolution);
     return { message: 'Dispute dismissed' };
   }
 
   async lockDisputeThread(id: string) {
     await this.assertDispute(id);
     await this.disputeRepo.update(id, { isLocked: true });
+    await this.logDisputeAction(id, DisputeLogAction.LOCKED, null);
     return { message: 'Dispute thread locked' };
   }
 
@@ -666,5 +687,134 @@ export class AdminService {
       }),
     );
     return report;
+  }
+
+  private async logDisputeAction(
+    disputeId: string,
+    action: DisputeLogAction,
+    adminId: string | null,
+    note?: string,
+    refundAmount?: number,
+  ): Promise<void> {
+    await this.disputeLogRepo.save(
+      this.disputeLogRepo.create({
+        disputeId,
+        action,
+        adminId,
+        note: note ?? null,
+        refundAmount: refundAmount ?? null,
+      }),
+    );
+  }
+
+  async getDisputeLog(disputeId: string): Promise<DisputeLog[]> {
+    await this.assertDispute(disputeId);
+    return this.disputeLogRepo.find({
+      where: { disputeId },
+      order: { createdAt: 'ASC' },
+    });
+  }
+
+  async issueFullRefund(disputeId: string, adminId: string, dto: IssueRefundDto): Promise<{ message: string }> {
+    const dispute = await this.assertDispute(disputeId);
+    await this.disputeRepo.update(disputeId, {
+      status: DisputeStatus.RESOLVED,
+      resolution: dto.reason ?? 'Full refund issued',
+      resolvedAt: new Date(),
+      refundAmount: dispute.refundAmount,
+    });
+    let refundAmt: number | undefined;
+    if (dispute.bookingId) {
+      const payment = await this.paymentRepo.findOne({ where: { bookingId: dispute.bookingId } });
+      refundAmt = payment ? Number(payment.amount) : undefined;
+    }
+    await this.disputeRepo.update(disputeId, { refundAmount: refundAmt ?? null });
+    await this.logDisputeAction(disputeId, DisputeLogAction.REFUND_FULL, adminId, dto.reason, refundAmt);
+    return { message: 'Full refund issued and dispute resolved' };
+  }
+
+  async issuePartialRefund(disputeId: string, adminId: string, dto: IssueRefundDto): Promise<{ message: string }> {
+    if (!dto.amount) throw new Error('Amount is required for partial refund');
+    await this.assertDispute(disputeId);
+    await this.disputeRepo.update(disputeId, {
+      status: DisputeStatus.RESOLVED,
+      resolution: dto.reason ?? `Partial refund of ${dto.amount} issued`,
+      resolvedAt: new Date(),
+      refundAmount: dto.amount,
+    });
+    await this.logDisputeAction(disputeId, DisputeLogAction.REFUND_PARTIAL, adminId, dto.reason, dto.amount);
+    return { message: `Partial refund of ${dto.amount} issued and dispute resolved` };
+  }
+
+  async getTeamMembers(): Promise<User[]> {
+    return this.userRepo.find({
+      where: { role: UserRole.ADMIN },
+      order: { createdAt: 'ASC' },
+    });
+  }
+
+  async inviteTeamMember(dto: InviteTeamMemberDto): Promise<{ user: User; temporaryPassword: string }> {
+    const existing = await this.userRepo.findOne({ where: { email: dto.email } });
+    if (existing) throw new ConflictException('Email already in use');
+    const temporaryPassword = randomBytes(6).toString('hex');
+    const hashed = await bcrypt.hash(temporaryPassword, 8);
+    const user = await this.userRepo.save(
+      this.userRepo.create({
+        email: dto.email,
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        password: hashed,
+        role: UserRole.ADMIN,
+        adminRole: dto.adminRole,
+        isEmailVerified: true,
+        kycStatus: KycStatus.APPROVED,
+      }),
+    );
+    return { user, temporaryPassword };
+  }
+
+  async updateTeamMemberRole(memberId: string, dto: UpdateTeamMemberRoleDto): Promise<{ message: string }> {
+    const member = await this.userRepo.findOne({ where: { id: memberId, role: UserRole.ADMIN } });
+    if (!member) throw new NotFoundException('Admin team member not found');
+    await this.userRepo.update(memberId, { adminRole: dto.adminRole });
+    return { message: 'Role updated' };
+  }
+
+  async removeTeamMember(memberId: string, currentAdminId: string): Promise<{ message: string }> {
+    if (memberId === currentAdminId) throw new ConflictException('Cannot remove yourself');
+    const member = await this.userRepo.findOne({ where: { id: memberId, role: UserRole.ADMIN } });
+    if (!member) throw new NotFoundException('Admin team member not found');
+    await this.userRepo.delete(memberId);
+    return { message: 'Team member removed' };
+  }
+
+  async getHostDocuments(hostId: string): Promise<HostDocument[]> {
+    return this.hostDocumentRepo.find({
+      where: { hostId },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async getDisputeByPayout(payoutId: string): Promise<Dispute | null> {
+    return this.disputeRepo.findOne({ where: { payoutId } });
+  }
+
+  // ─── Admin Notification Preferences ──────────────────────────────────────────
+
+  async getAdminNotificationPreferences(adminId: string): Promise<AdminNotificationPreferences> {
+    const existing = await this.adminNotifPrefsRepo.findOne({ where: { adminId } });
+    if (existing) return existing;
+    return this.adminNotifPrefsRepo.save(
+      this.adminNotifPrefsRepo.create({ adminId }),
+    );
+  }
+
+  async updateAdminNotificationPreferences(
+    adminId: string,
+    dto: UpdateAdminNotificationPreferencesDto,
+  ): Promise<AdminNotificationPreferences> {
+    await this.getAdminNotificationPreferences(adminId);
+    await this.adminNotifPrefsRepo.update({ adminId }, dto);
+    return this.adminNotifPrefsRepo.findOne({ where: { adminId } }) as Promise<AdminNotificationPreferences>;
   }
 }
