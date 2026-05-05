@@ -2,13 +2,27 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Notification, NotificationType } from './notification.entity';
+import { UserNotificationPreferences } from '../user/entities/user-notification-preferences.entity';
 
 @Injectable()
 export class NotificationsService {
   constructor(
     @InjectRepository(Notification)
     private readonly notificationRepository: Repository<Notification>,
+    @InjectRepository(UserNotificationPreferences)
+    private readonly notifPrefsRepository: Repository<UserNotificationPreferences>,
   ) {}
+
+  private async isAllowed(userId: string, type: NotificationType): Promise<boolean> {
+    const prefs = await this.notifPrefsRepository.findOne({ where: { userId } });
+    if (!prefs) return true;
+
+    if (!prefs.pushEnabled) return false;
+
+    if (type === NotificationType.CHECKIN_REMINDER) return prefs.pushCheckInReminders;
+
+    return true;
+  }
 
   async create(
     userId: string,
@@ -16,7 +30,10 @@ export class NotificationsService {
     title: string,
     body: string,
     referenceId?: string,
-  ): Promise<Notification> {
+  ): Promise<Notification | null> {
+    const allowed = await this.isAllowed(userId, type);
+    if (!allowed) return null;
+
     const notification = this.notificationRepository.create({
       userId,
       type,

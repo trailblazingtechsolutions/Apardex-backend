@@ -14,6 +14,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import {
   ApiBearerAuth,
+  ApiBody,
   ApiConsumes,
   ApiOperation,
   ApiResponse,
@@ -48,6 +49,19 @@ export class UserController {
   @UseInterceptors(FileInterceptor('avatar', { storage: memoryStorage() }))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Update profile fields + optional avatar' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        firstName: { type: 'string', example: 'John' },
+        lastName: { type: 'string', example: 'Doe' },
+        phoneNumber: { type: 'string', example: '+2348012345678' },
+        location: { type: 'string', example: 'Lagos, Nigeria' },
+        bio: { type: 'string', example: 'I love travelling.' },
+        avatar: { type: 'string', format: 'binary' },
+      },
+    },
+  })
   updateProfile(
     @CurrentUser() user: User,
     @Body() dto: UpdateProfileDto,

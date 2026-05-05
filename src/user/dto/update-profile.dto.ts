@@ -1,6 +1,5 @@
 import { IsOptional, IsString, MinLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import 'multer';
 
 export class UpdateProfileDto {
   @ApiPropertyOptional({ example: 'John' })
@@ -27,9 +26,6 @@ export class UpdateProfileDto {
   @IsString()
   @IsOptional()
   bio?: string;
-
-  @ApiPropertyOptional({ type: 'string', format: 'binary' })
-  avatar?: Express.Multer.File;
 }
 
 export class ChangePasswordDto {

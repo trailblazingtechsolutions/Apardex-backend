@@ -16,6 +16,8 @@ export enum NotificationType {
   PAYMENT_RECEIVED = 'payment_received',
   NEW_MESSAGE = 'new_message',
   REVIEW_RECEIVED = 'review_received',
+  CHECKIN_REMINDER = 'checkin_reminder',
+  REVIEW_PROMPT = 'review_prompt',
   GENERAL = 'general',
 }
 

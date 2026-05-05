@@ -457,7 +457,7 @@ export class AdminService {
   // ─── Disputes ────────────────────────────────────────────────────────────────
 
   private generateTicketId(): string {
-    return `#DP-${Math.floor(1000 + Math.random() * 9000)}`;
+    return `DIS-${Math.floor(100000 + Math.random() * 900000)}`;
   }
 
   async getDisputes(filters: DisputeFiltersDto) {
