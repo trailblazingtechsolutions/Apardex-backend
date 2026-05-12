@@ -2,6 +2,8 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, Repository } from 'typeorm';
@@ -28,9 +30,13 @@ import {
 } from './dto/dispute.dto';
 import { InviteTeamMemberDto, UpdateTeamMemberRoleDto } from './dto/team.dto';
 import { UpdateAdminNotificationPreferencesDto } from './dto/admin-notification-preferences.dto';
+import { UpdateAdminProfileDto, ChangeAdminPasswordDto } from './dto/admin-profile.dto';
+import { PaymentStatus } from '../payment/payment.entity';
 import { AdminNotificationPreferences } from './entities/admin-notification-preferences.entity';
 import { PayoutFiltersDto, CreatePayoutDto } from './dto/payout-filters.dto';
 import { GenerateReportDto } from './dto/report.dto';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../notifications/notification.entity';
 
 @Injectable()
 export class AdminService {
@@ -55,6 +61,7 @@ export class AdminService {
     private readonly hostDocumentRepo: Repository<HostDocument>,
     @InjectRepository(AdminNotificationPreferences)
     private readonly adminNotifPrefsRepo: Repository<AdminNotificationPreferences>,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   // ─── Seed / Bootstrap ────────────────────────────────────────────────────────
@@ -172,25 +179,53 @@ export class AdminService {
   }
 
   async approveProperty(id: string) {
-    await this.assertProperty(id);
+    const property = await this.assertProperty(id);
     await this.propertyRepo.update(id, { status: PropertyStatus.ACTIVE });
+    void this.notificationsService.create(
+      property.hostId,
+      NotificationType.GENERAL,
+      'Property Approved',
+      `Your listing "${property.title}" has been approved and is now live.`,
+      id,
+    );
     return { message: 'Property approved' };
   }
 
   async suspendProperty(id: string) {
-    await this.assertProperty(id);
+    const property = await this.assertProperty(id);
     await this.propertyRepo.update(id, { status: PropertyStatus.SUSPENDED });
+    void this.notificationsService.create(
+      property.hostId,
+      NotificationType.GENERAL,
+      'Property Suspended',
+      `Your listing "${property.title}" has been suspended by the admin team. Please contact support for more information.`,
+      id,
+    );
     return { message: 'Property suspended' };
   }
 
   async reactivateProperty(id: string) {
-    await this.assertProperty(id);
+    const property = await this.assertProperty(id);
     await this.propertyRepo.update(id, { status: PropertyStatus.ACTIVE });
+    void this.notificationsService.create(
+      property.hostId,
+      NotificationType.GENERAL,
+      'Property Reactivated',
+      `Your listing "${property.title}" has been reactivated and is now live again.`,
+      id,
+    );
     return { message: 'Property reactivated' };
   }
 
   async deleteProperty(id: string) {
     const property = await this.assertProperty(id);
+    void this.notificationsService.create(
+      property.hostId,
+      NotificationType.GENERAL,
+      'Property Removed',
+      `Your listing "${property.title}" has been removed by the admin team.`,
+      id,
+    );
     await this.propertyRepo.remove(property);
     return { message: 'Property deleted' };
   }
@@ -433,34 +468,99 @@ export class AdminService {
       where: { id: hostId, role: UserRole.HOST },
     });
     if (!host) throw new NotFoundException('Host not found');
-    return host;
+
+    const documents = await this.hostDocumentRepo.find({ where: { hostId } });
+    const propertyCount = await this.propertyRepo.count({ where: { hostId } });
+    const bookingCount = await this.bookingRepo.count({ where: { property: { hostId } as any } });
+
+    return { host, documents, propertyCount, bookingCount };
   }
 
   async approveKyc(hostId: string) {
-    await this.assertHost(hostId);
+    const host = await this.assertHost(hostId);
     await this.userRepo.update(hostId, {
       kycStatus: KycStatus.APPROVED,
       isDocumentVerified: true,
+      kycRejectionReason: null,
     });
+    void this.notificationsService.create(
+      hostId,
+      NotificationType.GENERAL,
+      'KYC Approved',
+      'Your identity verification has been approved. You can now list properties on Apardex.',
+      hostId,
+    );
     return { message: 'Host KYC approved' };
   }
 
   async rejectKyc(hostId: string, dto: KycActionDto) {
     await this.assertHost(hostId);
-    await this.userRepo.update(hostId, { kycStatus: KycStatus.REJECTED });
+    await this.userRepo.update(hostId, {
+      kycStatus: KycStatus.REJECTED,
+      kycRejectionReason: dto.reason ?? null,
+    });
+    void this.notificationsService.create(
+      hostId,
+      NotificationType.GENERAL,
+      'KYC Rejected',
+      dto.reason
+        ? `Your identity verification was rejected. Reason: ${dto.reason}`
+        : 'Your identity verification was rejected. Please contact support for details.',
+      hostId,
+    );
     return { message: 'Host KYC rejected', reason: dto.reason };
   }
 
   async flagKyc(hostId: string, dto: KycActionDto) {
     await this.assertHost(hostId);
-    await this.userRepo.update(hostId, { kycStatus: KycStatus.FLAGGED });
+    await this.userRepo.update(hostId, {
+      kycStatus: KycStatus.FLAGGED,
+      kycRejectionReason: dto.reason ?? null,
+    });
+    void this.notificationsService.create(
+      hostId,
+      NotificationType.GENERAL,
+      'Account Flagged for Review',
+      'Your account has been flagged for manual review. Our team will reach out if additional information is needed.',
+      hostId,
+    );
     return { message: 'Host KYC flagged for review', reason: dto.reason };
   }
 
   async setKycUnderReview(hostId: string) {
     await this.assertHost(hostId);
     await this.userRepo.update(hostId, { kycStatus: KycStatus.UNDER_REVIEW });
+    void this.notificationsService.create(
+      hostId,
+      NotificationType.GENERAL,
+      'KYC Under Review',
+      'Your identity verification is now under review. We will notify you once a decision is made.',
+      hostId,
+    );
     return { message: 'Host KYC set to under review' };
+  }
+
+  async getKycStats() {
+    const [pending, underReview, approved, rejected, flagged] = await Promise.all([
+      this.userRepo.count({ where: { role: UserRole.HOST, kycStatus: KycStatus.PENDING } }),
+      this.userRepo.count({ where: { role: UserRole.HOST, kycStatus: KycStatus.UNDER_REVIEW } }),
+      this.userRepo.count({ where: { role: UserRole.HOST, kycStatus: KycStatus.APPROVED } }),
+      this.userRepo.count({ where: { role: UserRole.HOST, kycStatus: KycStatus.REJECTED } }),
+      this.userRepo.count({ where: { role: UserRole.HOST, kycStatus: KycStatus.FLAGGED } }),
+    ]);
+
+    const recentSubmissions = await this.userRepo
+      .createQueryBuilder('u')
+      .where('u.role = :role', { role: UserRole.HOST })
+      .andWhere('u.documentUrl IS NOT NULL')
+      .orderBy('u.updatedAt', 'DESC')
+      .limit(10)
+      .getMany();
+
+    return {
+      stats: { pending, underReview, approved, rejected, flagged, total: pending + underReview + approved + rejected + flagged },
+      recentSubmissions,
+    };
   }
 
   private async assertHost(id: string): Promise<User> {
@@ -546,13 +646,19 @@ export class AdminService {
   }
 
   async dismissDispute(id: string, dto: ResolveDisputeDto) {
-    await this.assertDispute(id);
+    const dispute = await this.assertDispute(id);
     await this.disputeRepo.update(id, {
       status: DisputeStatus.DISMISSED,
       resolution: dto.resolution ?? null,
       resolvedAt: new Date(),
     });
     await this.logDisputeAction(id, DisputeLogAction.DISMISSED, null, dto.resolution);
+
+    const notifMsg = dto.resolution
+      ? `Your dispute (${dispute.ticketId}) has been dismissed. Reason: ${dto.resolution}`
+      : `Your dispute (${dispute.ticketId}) has been reviewed and dismissed.`;
+    void this.notificationsService.create(dispute.reportedById, NotificationType.GENERAL, 'Dispute Dismissed', notifMsg, id);
+
     return { message: 'Dispute dismissed' };
   }
 
@@ -717,32 +823,53 @@ export class AdminService {
 
   async issueFullRefund(disputeId: string, adminId: string, dto: IssueRefundDto): Promise<{ message: string }> {
     const dispute = await this.assertDispute(disputeId);
+
+    let refundAmt: number | null = null;
+    if (dispute.bookingId) {
+      const payment = await this.paymentRepo.findOne({ where: { bookingId: dispute.bookingId } });
+      if (payment) refundAmt = Number(payment.amount);
+    }
+
     await this.disputeRepo.update(disputeId, {
       status: DisputeStatus.RESOLVED,
       resolution: dto.reason ?? 'Full refund issued',
       resolvedAt: new Date(),
-      refundAmount: dispute.refundAmount,
+      refundAmount: refundAmt,
     });
-    let refundAmt: number | undefined;
-    if (dispute.bookingId) {
-      const payment = await this.paymentRepo.findOne({ where: { bookingId: dispute.bookingId } });
-      refundAmt = payment ? Number(payment.amount) : undefined;
+
+    await this.logDisputeAction(disputeId, DisputeLogAction.REFUND_FULL, adminId, dto.reason, refundAmt ?? undefined);
+
+    const notifMsg = refundAmt
+      ? `A full refund of ${refundAmt} has been issued for your dispute (${dispute.ticketId}).`
+      : `Your dispute (${dispute.ticketId}) has been resolved with a full refund.`;
+
+    void this.notificationsService.create(dispute.reportedById, NotificationType.GENERAL, 'Full Refund Issued', notifMsg, disputeId);
+    if (dispute.guestId && dispute.guestId !== dispute.reportedById) {
+      void this.notificationsService.create(dispute.guestId, NotificationType.GENERAL, 'Full Refund Issued', notifMsg, disputeId);
     }
-    await this.disputeRepo.update(disputeId, { refundAmount: refundAmt ?? null });
-    await this.logDisputeAction(disputeId, DisputeLogAction.REFUND_FULL, adminId, dto.reason, refundAmt);
+
     return { message: 'Full refund issued and dispute resolved' };
   }
 
   async issuePartialRefund(disputeId: string, adminId: string, dto: IssueRefundDto): Promise<{ message: string }> {
-    if (!dto.amount) throw new Error('Amount is required for partial refund');
-    await this.assertDispute(disputeId);
+    if (!dto.amount) throw new BadRequestException('Amount is required for partial refund');
+    const dispute = await this.assertDispute(disputeId);
+
     await this.disputeRepo.update(disputeId, {
       status: DisputeStatus.RESOLVED,
       resolution: dto.reason ?? `Partial refund of ${dto.amount} issued`,
       resolvedAt: new Date(),
       refundAmount: dto.amount,
     });
+
     await this.logDisputeAction(disputeId, DisputeLogAction.REFUND_PARTIAL, adminId, dto.reason, dto.amount);
+
+    const notifMsg = `A partial refund of ${dto.amount} has been issued for your dispute (${dispute.ticketId}).`;
+    void this.notificationsService.create(dispute.reportedById, NotificationType.GENERAL, 'Partial Refund Issued', notifMsg, disputeId);
+    if (dispute.guestId && dispute.guestId !== dispute.reportedById) {
+      void this.notificationsService.create(dispute.guestId, NotificationType.GENERAL, 'Partial Refund Issued', notifMsg, disputeId);
+    }
+
     return { message: `Partial refund of ${dto.amount} issued and dispute resolved` };
   }
 
@@ -816,5 +943,113 @@ export class AdminService {
     await this.getAdminNotificationPreferences(adminId);
     await this.adminNotifPrefsRepo.update({ adminId }, dto);
     return this.adminNotifPrefsRepo.findOne({ where: { adminId } }) as Promise<AdminNotificationPreferences>;
+  }
+
+  // ─── Admin Profile & Security ─────────────────────────────────────────────────
+
+  async getAdminProfile(adminId: string): Promise<Partial<User>> {
+    const admin = await this.userRepo.findOne({ where: { id: adminId } });
+    if (!admin) throw new NotFoundException('Admin not found');
+    const { password, otp, otpExpiresAt, ...safe } = admin;
+    return safe;
+  }
+
+  async updateAdminProfile(adminId: string, dto: UpdateAdminProfileDto): Promise<Partial<User>> {
+    await this.userRepo.update(adminId, dto);
+    return this.getAdminProfile(adminId);
+  }
+
+  async changeAdminPassword(adminId: string, dto: ChangeAdminPasswordDto): Promise<{ message: string }> {
+    const admin = await this.userRepo
+      .createQueryBuilder('u')
+      .addSelect('u.password')
+      .where('u.id = :adminId', { adminId })
+      .getOne();
+    if (!admin) throw new NotFoundException('Admin not found');
+
+    const valid = await bcrypt.compare(dto.currentPassword, admin.password);
+    if (!valid) throw new BadRequestException('Current password is incorrect');
+
+    const hashed = await bcrypt.hash(dto.newPassword, 8);
+    await this.userRepo.update(adminId, {
+      password: hashed,
+      tokenVersion: (admin.tokenVersion ?? 0) + 1,
+    });
+    return { message: 'Password updated successfully' };
+  }
+
+  // ─── Payments (Financial Officer) ────────────────────────────────────────────
+
+  async getPayments(page = 1, limit = 20, status?: PaymentStatus) {
+    const query = this.paymentRepo
+      .createQueryBuilder('p')
+      .leftJoinAndSelect('p.booking', 'booking')
+      .leftJoinAndSelect('p.user', 'user');
+
+    if (status) query.where('p.status = :status', { status });
+
+    const total = await query.getCount();
+    const data = await query
+      .skip((page - 1) * limit)
+      .take(limit)
+      .orderBy('p.createdAt', 'DESC')
+      .getMany();
+
+    return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
+  }
+
+  async getPaymentById(id: string): Promise<Payment> {
+    const payment = await this.paymentRepo
+      .createQueryBuilder('p')
+      .leftJoinAndSelect('p.booking', 'booking')
+      .leftJoinAndSelect('p.user', 'user')
+      .where('p.id = :id', { id })
+      .getOne();
+    if (!payment) throw new NotFoundException('Payment not found');
+    return payment;
+  }
+
+  // ─── Refunds Queue (Financial Officer) ───────────────────────────────────────
+
+  async getRefundsQueue(page = 1, limit = 20) {
+    const query = this.disputeRepo
+      .createQueryBuilder('d')
+      .where('d.refundAmount IS NOT NULL')
+      .orderBy('d.updatedAt', 'DESC');
+
+    const total = await query.getCount();
+    const data = await query
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getMany();
+
+    return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
+  }
+
+  async approveRefund(disputeId: string, adminId: string): Promise<{ message: string }> {
+    const dispute = await this.assertDispute(disputeId);
+    if (!dispute.refundAmount) throw new BadRequestException('No refund amount set on this dispute');
+    return this.issueFullRefund(disputeId, adminId, { reason: 'Refund approved by Financial Officer' });
+  }
+
+  async rejectRefund(disputeId: string, adminId: string, reason: string): Promise<{ message: string }> {
+    return this.dismissDispute(disputeId, { resolution: reason });
+  }
+
+  // ─── Batch Payout (Financial Officer) ────────────────────────────────────────
+
+  async runBatchPayouts(): Promise<{ message: string; processed: number }> {
+    const processing = await this.payoutRepo.find({ where: { status: HostPayoutStatus.PROCESSING } });
+    if (processing.length === 0) return { message: 'No payouts in processing queue', processed: 0 };
+
+    for (const payout of processing) {
+      await this.payoutRepo.update(payout.id, { status: HostPayoutStatus.COMPLETE });
+    }
+    return { message: `${processing.length} payout(s) marked complete`, processed: processing.length };
+  }
+
+  async syncPaymentGateway(): Promise<{ message: string; syncedAt: string }> {
+    // Stub — integrate with actual payment gateway reconciliation when available
+    return { message: 'Payment gateway sync initiated', syncedAt: new Date().toISOString() };
   }
 }

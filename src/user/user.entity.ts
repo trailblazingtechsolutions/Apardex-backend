@@ -76,6 +76,9 @@ export class User {
   })
   kycStatus!: KycStatus;
 
+  @Column({ type: 'text', nullable: true })
+  kycRejectionReason!: string | null;
+
   @Column({ nullable: true })
   phoneNumber!: string;
 

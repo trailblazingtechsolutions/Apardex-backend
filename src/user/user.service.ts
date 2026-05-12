@@ -420,6 +420,7 @@ export class UserService {
   async createSession(
     userId: string,
     meta: { ip?: string; userAgent?: string },
+    refreshData?: { hash: string; expiresAt: Date },
   ): Promise<UserSession> {
     const parsed = meta.userAgent
       ? parseUserAgent(meta.userAgent)
@@ -437,9 +438,22 @@ export class UserService {
         deviceName: parsed.deviceName,
         deviceType: parsed.deviceType,
         browser: parsed.browser,
+        refreshTokenHash: refreshData?.hash ?? null,
+        expiresAt: refreshData?.expiresAt ?? null,
         lastActiveAt: new Date(),
       }),
     );
+  }
+
+  async updateSessionRefreshToken(
+    sessionId: string,
+    hash: string,
+    expiresAt: Date,
+  ): Promise<void> {
+    await this.sessionRepository.update(sessionId, {
+      refreshTokenHash: hash,
+      expiresAt,
+    });
   }
 
   async findActiveSession(sessionId: string): Promise<UserSession | null> {

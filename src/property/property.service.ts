@@ -90,24 +90,30 @@ export class PropertyService {
   }
 
   async findFeatured(): Promise<Property[]> {
-    return this.propertyRepository.find({
-      where: { status: PropertyStatus.ACTIVE },
-      order: { avgRating: 'DESC', totalReviews: 'DESC' },
-      take: 8,
-    });
+    return this.propertyRepository
+      .createQueryBuilder('property')
+      .where('property.status = :status', { status: PropertyStatus.ACTIVE })
+      .orderBy('property.avgRating', 'DESC')
+      .addOrderBy('property.totalReviews', 'DESC')
+      .take(8)
+      .getMany();
   }
 
   async findById(id: string): Promise<Property> {
-    const property = await this.propertyRepository.findOne({ where: { id } });
+    const property = await this.propertyRepository
+      .createQueryBuilder('property')
+      .where('property.id = :id', { id })
+      .getOne();
     if (!property) throw new NotFoundException('Property not found');
     return property;
   }
 
   async findByHost(hostId: string): Promise<Property[]> {
-    return this.propertyRepository.find({
-      where: { hostId },
-      order: { createdAt: 'DESC' },
-    });
+    return this.propertyRepository
+      .createQueryBuilder('property')
+      .where('property.hostId = :hostId', { hostId })
+      .orderBy('property.createdAt', 'DESC')
+      .getMany();
   }
 
   async update(

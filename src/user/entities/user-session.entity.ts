@@ -35,6 +35,12 @@ export class UserSession {
   @Column({ type: 'varchar', nullable: true })
   browser!: string | null;
 
+  @Column({ type: 'varchar', nullable: true })
+  refreshTokenHash!: string | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  expiresAt!: Date | null;
+
   @Column({ default: true })
   isActive!: boolean;
 

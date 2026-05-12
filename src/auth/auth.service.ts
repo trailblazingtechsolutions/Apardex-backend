@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
+import { createHash, randomBytes } from 'crypto';
 import { UserService } from '../user/user.service';
 import { User, UserRole } from '../user/user.entity';
 import { UserRegisterDto } from './dto/user-register.dto';
@@ -48,9 +49,22 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       role: user.role,
+      adminRole: user.adminRole ?? null,
       tokenVersion: user.tokenVersion ?? 0,
       sessionId: sessionId ?? null,
     });
+  }
+
+  private buildRefreshToken(sessionId: string): {
+    raw: string;
+    hash: string;
+    expiresAt: Date;
+  } {
+    const secret = randomBytes(40).toString('hex');
+    const raw = `${sessionId}.${secret}`;
+    const hash = createHash('sha256').update(raw).digest('hex');
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+    return { raw, hash, expiresAt };
   }
 
   async registerUser(dto: UserRegisterDto) {
@@ -163,8 +177,10 @@ export class AuthService {
       );
 
     const session = await this.userService.createSession(user.id, meta);
-    const token = this.generateToken(user, session.id);
-    return { accessToken: token };
+    const { raw, hash, expiresAt } = this.buildRefreshToken(session.id);
+    await this.userService.updateSessionRefreshToken(session.id, hash, expiresAt);
+    const accessToken = this.generateToken(user, session.id);
+    return { accessToken, refreshToken: raw };
   }
 
   async resendVerificationOtp(email: string) {
@@ -229,5 +245,30 @@ export class AuthService {
     });
 
     return { message: 'Password reset successfully' };
+  }
+
+  async refresh(rawRefreshToken: string): Promise<{ accessToken: string }> {
+    const dotIndex = rawRefreshToken.indexOf('.');
+    if (dotIndex === -1) throw new UnauthorizedException('Invalid refresh token');
+
+    const sessionId = rawRefreshToken.substring(0, dotIndex);
+    const hash = createHash('sha256').update(rawRefreshToken).digest('hex');
+
+    const session = await this.userService.findActiveSession(sessionId);
+    if (!session || session.refreshTokenHash !== hash) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+    if (session.expiresAt && new Date() > session.expiresAt) {
+      await this.userService.revokeSession(session.userId, sessionId);
+      throw new UnauthorizedException('Refresh token expired, please log in again');
+    }
+
+    const user = await this.userService.findById(session.userId);
+    void this.userService.touchSession(sessionId);
+    return { accessToken: this.generateToken(user, sessionId) };
+  }
+
+  async logout(userId: string, sessionId: string): Promise<{ message: string }> {
+    return this.userService.revokeSession(userId, sessionId);
   }
 }

@@ -13,10 +13,14 @@ import { DisputeLog } from './entities/dispute-log.entity';
 import { AdminNotificationPreferences } from './entities/admin-notification-preferences.entity';
 import { AdminService } from './admin.service';
 import { AdminController } from './admin.controller';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { SupportModule } from '../support/support.module';
 
 @Module({
   imports: [
     ConfigModule,
+    NotificationsModule,
+    SupportModule,
     TypeOrmModule.forFeature([
       User,
       Property,

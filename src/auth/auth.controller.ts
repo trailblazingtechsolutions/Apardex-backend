@@ -96,6 +96,21 @@ export class UserAuthController {
   resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto);
   }
+
+  @Post('refresh')
+  @ApiOperation({ summary: 'Exchange refresh token for a new access token' })
+  @ApiResponse({ status: 200, description: 'Returns new access token' })
+  refresh(@Body('refreshToken') refreshToken: string) {
+    return this.authService.refresh(refreshToken);
+  }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Logout and invalidate current session' })
+  logout(@CurrentUser() user: User) {
+    return this.authService.logout(user.id, user.currentSessionId!);
+  }
 }
 
 // ─── Host Auth ────────────────────────────────────────────────────────────────
@@ -186,6 +201,21 @@ export class HostAuthController {
     return this.authService.resetPassword(dto);
   }
 
+  @Post('refresh')
+  @ApiOperation({ summary: 'Exchange refresh token for a new access token' })
+  @ApiResponse({ status: 200, description: 'Returns new access token' })
+  refresh(@Body('refreshToken') refreshToken: string) {
+    return this.authService.refresh(refreshToken);
+  }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Logout and invalidate current session' })
+  logout(@CurrentUser() user: User) {
+    return this.authService.logout(user.id, user.currentSessionId!);
+  }
+
   @Post('upload-document')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('document', { storage: memoryStorage() }))
@@ -255,5 +285,19 @@ export class AdminAuthController {
   @ApiOperation({ summary: 'Reset admin password using OTP' })
   resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto);
+  }
+
+  @Post('refresh')
+  @ApiOperation({ summary: 'Exchange refresh token for a new access token' })
+  refresh(@Body('refreshToken') refreshToken: string) {
+    return this.authService.refresh(refreshToken);
+  }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Logout and invalidate current session' })
+  logout(@CurrentUser() user: User) {
+    return this.authService.logout(user.id, user.currentSessionId!);
   }
 }

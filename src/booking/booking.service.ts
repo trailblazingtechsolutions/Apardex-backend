@@ -7,6 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Booking, BookingStatus } from './booking.entity';
+import { PropertyStatus } from '../property/property.entity';
 import { PropertyService } from '../property/property.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { ModifyBookingDto } from './dto/modify-booking.dto';
@@ -29,6 +30,10 @@ export class BookingService {
 
   async create(userId: string, dto: CreateBookingDto): Promise<Booking> {
     const property = await this.propertyService.findById(dto.propertyId);
+
+    if (property.status !== PropertyStatus.ACTIVE) {
+      throw new BadRequestException('This property is not available for booking');
+    }
 
     if (dto.guests > property.maxGuests) {
       throw new BadRequestException(

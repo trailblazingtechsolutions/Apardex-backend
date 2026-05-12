@@ -18,6 +18,7 @@ import { PaymentModule } from './payment/payment.module';
 import { HostModule } from './host/host.module';
 import { AdminModule } from './admin/admin.module';
 import { DisputesModule } from './disputes/disputes.module';
+import { SupportModule } from './support/support.module';
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { DisputesModule } from './disputes/disputes.module';
     PaymentModule,
     AdminModule,
     DisputesModule,
+    SupportModule,
   ],
   controllers: [AppController],
   providers: [AppService],
