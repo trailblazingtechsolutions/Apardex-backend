@@ -386,6 +386,15 @@ export class AdminController {
     return this.adminService.getDisputeByPayout(id);
   }
 
+  // ─── Financial Officer Dashboard ─────────────────────────────────────────────
+
+  @Get('finance/dashboard')
+  @AdminRoles(AdminRole.SUPER_ADMIN, AdminRole.FINANCIAL_OFFICER)
+  @ApiOperation({ summary: 'Financial Officer dashboard — payouts, refunds, revenue stats' })
+  getFinancialDashboard() {
+    return this.adminService.getFinancialDashboard();
+  }
+
   // ─── Payments (Financial Officer) ────────────────────────────────────────────
 
   @Get('payments')
@@ -417,12 +426,14 @@ export class AdminController {
 
   @Get('refunds')
   @AdminRoles(AdminRole.SUPER_ADMIN, AdminRole.FINANCIAL_OFFICER)
-  @ApiOperation({ summary: 'List disputes with pending refund decisions' })
+  @ApiOperation({ summary: 'Refunds queue — omit resolved param for all, ?resolved=true for processed, ?resolved=false for pending' })
   getRefundsQueue(
     @Query('page') page?: number,
     @Query('limit') limit?: number,
+    @Query('resolved') resolved?: string,
   ) {
-    return this.adminService.getRefundsQueue(page, limit);
+    const resolvedBool = resolved === undefined ? undefined : resolved === 'true';
+    return this.adminService.getRefundsQueue(page, limit, resolvedBool);
   }
 
   @Post('refunds/:id/approve')

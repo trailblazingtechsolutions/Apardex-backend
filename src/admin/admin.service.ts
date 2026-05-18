@@ -6,7 +6,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ILike, Repository } from 'typeorm';
+import { ILike, Not, Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import { User, UserRole, KycStatus, AdminRole } from '../user/user.entity';
@@ -17,7 +17,7 @@ import { HostPayout, HostPayoutStatus } from '../host/entities/host-payout.entit
 import { Dispute, DisputeStatus } from './entities/dispute.entity';
 import { DisputeLog, DisputeLogAction } from './entities/dispute-log.entity';
 import { HostDocument } from '../host/entities/host-document.entity';
-import { AdminReport, ReportStatus } from './entities/admin-report.entity';
+import { AdminReport, ReportStatus, ReportType } from './entities/admin-report.entity';
 import { PropertyFiltersDto } from './dto/property-filters.dto';
 import { BookingFiltersDto } from './dto/booking-filters.dto';
 import { UserFiltersDto, HostFiltersDto } from './dto/user-filters.dto';
@@ -785,6 +785,7 @@ export class AdminService {
     const report = await this.reportRepo.save(
       this.reportRepo.create({
         name: dto.name,
+        reportType: dto.reportType ?? ReportType.CUSTOM,
         outputType: dto.outputType,
         status: ReportStatus.GENERATING,
         dateRangeStart: dto.dateRangeStart ? new Date(dto.dateRangeStart) : null,
@@ -1011,19 +1012,101 @@ export class AdminService {
 
   // ─── Refunds Queue (Financial Officer) ───────────────────────────────────────
 
-  async getRefundsQueue(page = 1, limit = 20) {
-    const query = this.disputeRepo
+  async getRefundsQueue(page = 1, limit = 20, resolved?: boolean) {
+    const qb = this.disputeRepo
       .createQueryBuilder('d')
-      .where('d.refundAmount IS NOT NULL')
-      .orderBy('d.updatedAt', 'DESC');
+      .where('d.refundAmount IS NOT NULL');
 
-    const total = await query.getCount();
-    const data = await query
+    if (resolved === true) {
+      qb.andWhere('d.status = :status', { status: DisputeStatus.RESOLVED });
+    } else if (resolved === false) {
+      qb.andWhere('d.status != :status', { status: DisputeStatus.RESOLVED });
+    }
+
+    qb.orderBy('d.updatedAt', 'DESC');
+
+    const [total, pending, processed] = await Promise.all([
+      qb.getCount(),
+      this.disputeRepo.count({ where: { refundAmount: Not(null) as any, status: DisputeStatus.IN_REVIEW } }),
+      this.disputeRepo.count({ where: { refundAmount: Not(null) as any, status: DisputeStatus.RESOLVED } }),
+    ]);
+
+    const data = await qb
       .skip((page - 1) * limit)
       .take(limit)
       .getMany();
 
-    return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
+    return { data, meta: { total, pending, processed, page, limit, totalPages: Math.ceil(total / limit) } };
+  }
+
+  async getFinancialDashboard() {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const [
+      totalPayoutsResult,
+      processingPayoutsResult,
+      totalRefundsResult,
+      pendingRefunds,
+      revenueResult,
+      disputesByType,
+      recentPayments,
+    ] = await Promise.all([
+      this.payoutRepo
+        .createQueryBuilder('p')
+        .select('COALESCE(SUM(p.amount), 0)', 'total')
+        .where('p.status = :status', { status: HostPayoutStatus.COMPLETE })
+        .getRawOne<{ total: string }>(),
+
+      this.payoutRepo
+        .createQueryBuilder('p')
+        .select('COALESCE(SUM(p.amount), 0)', 'total')
+        .where('p.status = :status', { status: HostPayoutStatus.PROCESSING })
+        .getRawOne<{ total: string }>(),
+
+      this.disputeRepo
+        .createQueryBuilder('d')
+        .select('COALESCE(SUM(d.refundAmount), 0)', 'total')
+        .where('d.status = :status', { status: DisputeStatus.RESOLVED })
+        .andWhere('d.refundAmount IS NOT NULL')
+        .getRawOne<{ total: string }>(),
+
+      this.disputeRepo.count({
+        where: { refundAmount: Not(null) as any, status: DisputeStatus.IN_REVIEW },
+      }),
+
+      this.paymentRepo
+        .createQueryBuilder('p')
+        .select('COALESCE(SUM(p.amount), 0)', 'total')
+        .where('p.createdAt >= :monthStart', { monthStart })
+        .getRawOne<{ total: string }>(),
+
+      this.disputeRepo
+        .createQueryBuilder('d')
+        .select('d.type', 'type')
+        .addSelect('COUNT(*)', 'count')
+        .groupBy('d.type')
+        .getRawMany<{ type: string; count: string }>(),
+
+      this.paymentRepo
+        .createQueryBuilder('p')
+        .leftJoinAndSelect('p.user', 'user')
+        .orderBy('p.createdAt', 'DESC')
+        .limit(10)
+        .getMany(),
+    ]);
+
+    return {
+      stats: {
+        totalPayoutsCompleted: parseFloat(totalPayoutsResult?.total ?? '0'),
+        totalPayoutsProcessing: parseFloat(processingPayoutsResult?.total ?? '0'),
+        totalRefundsIssued: parseFloat(totalRefundsResult?.total ?? '0'),
+        pendingRefunds,
+        revenueThisMonth: parseFloat(revenueResult?.total ?? '0'),
+      },
+      disputesByType,
+      recentPayments,
+    };
   }
 
   async approveRefund(disputeId: string, adminId: string): Promise<{ message: string }> {

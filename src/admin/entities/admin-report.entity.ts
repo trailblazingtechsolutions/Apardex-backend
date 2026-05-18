@@ -11,6 +11,14 @@ export enum ReportOutputType {
   CSV_PDF = 'csv_pdf',
 }
 
+export enum ReportType {
+  CUSTOM = 'custom',
+  MONTHLY = 'monthly',
+  PAYOUT_SUMMARY = 'payout_summary',
+  REFUNDS_ADJUSTMENTS = 'refunds_adjustments',
+  PLATFORM_PERFORMANCE = 'platform_performance',
+}
+
 export enum ReportStatus {
   PENDING = 'pending',
   GENERATING = 'generating',
@@ -25,6 +33,9 @@ export class AdminReport {
 
   @Column()
   name!: string;
+
+  @Column({ type: 'enum', enum: ReportType, default: ReportType.CUSTOM })
+  reportType!: ReportType;
 
   @Column({ type: 'enum', enum: ReportOutputType, default: ReportOutputType.CSV })
   outputType!: ReportOutputType;
