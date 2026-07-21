@@ -9,7 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { createHash, randomBytes } from 'crypto';
 import { UserService } from '../user/user.service';
-import { User, UserRole } from '../user/user.entity';
+import { AuthProvider, User, UserRole } from '../user/user.entity';
 import { UserRegisterDto } from './dto/user-register.dto';
 import { HostRegisterDto } from './dto/host-register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -76,7 +76,7 @@ export class AuthService {
 
     const user = await this.userService.create({
       ...dto,
-      firstName: dto.fullName,
+      fullName: dto.fullName,
       password: hashedPassword,
       role: UserRole.USER,
       otp,
@@ -85,7 +85,7 @@ export class AuthService {
 
     this.logger.log(`Sending OTP email to ${user.email}...`);
     try {
-      await this.mailerService.sendOtp(user.email, user.firstName, otp);
+      await this.mailerService.sendOtp(user.email, user.fullName ?? user.firstName, otp);
       this.logger.log(`OTP email sent successfully to ${user.email}`);
     } catch (err) {
       this.logger.error(`Failed to send OTP email to ${user.email}`, err);
@@ -118,7 +118,7 @@ export class AuthService {
 
     const user = await this.userService.create({
       ...dto,
-      firstName: dto.fullName,
+      fullName: dto.fullName,
       password: hashedPassword,
       role: UserRole.HOST,
       otp,
@@ -129,7 +129,7 @@ export class AuthService {
 
     this.logger.log(`Sending OTP email to ${user.email}...`);
     try {
-      await this.mailerService.sendOtp(user.email, user.firstName, otp);
+      await this.mailerService.sendOtp(user.email, user.fullName ?? user.firstName, otp);
       this.logger.log(`OTP email sent successfully to ${user.email}`);
     } catch (err) {
       this.logger.error(`Failed to send OTP email to ${user.email}`, err);
@@ -168,6 +168,11 @@ export class AuthService {
     if (user.role !== expectedRole)
       throw new UnauthorizedException('Invalid credentials');
 
+    if (!user.password)
+      throw new UnauthorizedException(
+        'This account uses Google sign-in. Please continue with Google.',
+      );
+
     const passwordMatch = await bcrypt.compare(dto.password, user.password);
     if (!passwordMatch) throw new UnauthorizedException('Invalid credentials');
 
@@ -176,11 +181,79 @@ export class AuthService {
         'Please verify your email before logging in',
       );
 
+    return this.issueTokens(user, meta);
+  }
+
+  private async issueTokens(
+    user: User,
+    meta: { ip?: string; userAgent?: string } = {},
+  ): Promise<{ accessToken: string; refreshToken: string }> {
     const session = await this.userService.createSession(user.id, meta);
     const { raw, hash, expiresAt } = this.buildRefreshToken(session.id);
     await this.userService.updateSessionRefreshToken(session.id, hash, expiresAt);
     const accessToken = this.generateToken(user, session.id);
     return { accessToken, refreshToken: raw };
+  }
+
+  /**
+   * Find-or-create for Google OAuth. Handles both sign up (new account) and
+   * sign in (existing account), then issues our own JWT + refresh token.
+   */
+  async validateGoogleUser(
+    profile: {
+      googleId: string;
+      email: string;
+      firstName?: string;
+      lastName?: string;
+      avatarUrl?: string;
+    },
+    meta: { ip?: string; userAgent?: string } = {},
+  ): Promise<{ accessToken: string; refreshToken: string; isNewUser: boolean }> {
+    if (!profile.email)
+      throw new UnauthorizedException('Google account has no email address');
+
+    let isNewUser = false;
+
+    // 1. Already linked by Google ID.
+    let user = await this.userService.findByGoogleId(profile.googleId);
+
+    // 2. Match by email — link the Google identity onto the existing account.
+    if (!user) {
+      user = await this.userService.findByEmail(profile.email);
+      if (user) {
+        user = await this.userService.update(user.id, {
+          googleId: profile.googleId,
+          authProvider: AuthProvider.GOOGLE,
+          isEmailVerified: true,
+          avatarUrl: user.avatarUrl ?? profile.avatarUrl ?? null,
+        });
+      }
+    }
+
+    // 3. New account — sign up via Google. Email is trusted/verified by Google.
+    if (!user) {
+      isNewUser = true;
+      const fullName = [profile.firstName, profile.lastName]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+      user = await this.userService.create({
+        email: profile.email,
+        fullName: fullName || profile.email.split('@')[0],
+        password: null,
+        googleId: profile.googleId,
+        authProvider: AuthProvider.GOOGLE,
+        role: UserRole.USER,
+        isEmailVerified: true,
+        avatarUrl: profile.avatarUrl ?? null,
+      });
+    }
+
+    if (!user.isActive)
+      throw new UnauthorizedException('This account has been deactivated');
+
+    const tokens = await this.issueTokens(user, meta);
+    return { ...tokens, isNewUser };
   }
 
   async resendVerificationOtp(email: string) {
@@ -198,7 +271,7 @@ export class AuthService {
 
     this.logger.log(`Resending OTP email to ${user.email}...`);
     try {
-      await this.mailerService.sendOtp(user.email, user.firstName, otp);
+      await this.mailerService.sendOtp(user.email, user.fullName ?? user.firstName, otp);
       this.logger.log(`OTP email resent successfully to ${user.email}`);
     } catch (err) {
       this.logger.error(`Failed to resend OTP email to ${user.email}`, err);
@@ -220,7 +293,7 @@ export class AuthService {
 
     this.logger.log(`Sending password reset OTP email to ${user.email}...`);
     try {
-      await this.mailerService.sendPasswordResetOtp(user.email, user.firstName, otp);
+      await this.mailerService.sendPasswordResetOtp(user.email, user.fullName ?? user.firstName, otp);
       this.logger.log(`Password reset OTP email sent successfully to ${user.email}`);
     } catch (err) {
       this.logger.error(`Failed to send reset OTP email to ${user.email}`, err);

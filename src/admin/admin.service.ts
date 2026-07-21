@@ -156,7 +156,7 @@ export class AdminService {
       });
     if (search)
       qb.andWhere(
-        '(p.title ILIKE :search OR p.location ILIKE :search OR host.firstName ILIKE :search OR host.lastName ILIKE :search)',
+        '(p.title ILIKE :search OR p.location ILIKE :search OR host.fullName ILIKE :search)',
         { search: `%${search}%` },
       );
 
@@ -249,7 +249,7 @@ export class AdminService {
     if (status) qb.andWhere('b.status = :status', { status });
     if (search)
       qb.andWhere(
-        '(b.id ILIKE :search OR property.title ILIKE :search OR guest.firstName ILIKE :search OR guest.lastName ILIKE :search)',
+        '(b.id ILIKE :search OR property.title ILIKE :search OR guest.fullName ILIKE :search)',
         { search: `%${search}%` },
       );
 
@@ -285,7 +285,7 @@ export class AdminService {
       qb.andWhere('u.isActive = :isActive', { isActive });
     if (search)
       qb.andWhere(
-        '(u.firstName ILIKE :search OR u.lastName ILIKE :search OR u.email ILIKE :search)',
+        '(u.fullName ILIKE :search OR u.email ILIKE :search)',
         { search: `%${search}%` },
       );
 
@@ -373,7 +373,7 @@ export class AdminService {
       qb.andWhere('u.isActive = :isActive', { isActive });
     if (search)
       qb.andWhere(
-        '(u.firstName ILIKE :search OR u.lastName ILIKE :search OR u.email ILIKE :search)',
+        '(u.fullName ILIKE :search OR u.email ILIKE :search)',
         { search: `%${search}%` },
       );
 
@@ -967,6 +967,8 @@ export class AdminService {
       .where('u.id = :adminId', { adminId })
       .getOne();
     if (!admin) throw new NotFoundException('Admin not found');
+    if (!admin.password)
+      throw new BadRequestException('This account has no password set');
 
     const valid = await bcrypt.compare(dto.currentPassword, admin.password);
     if (!valid) throw new BadRequestException('Current password is incorrect');

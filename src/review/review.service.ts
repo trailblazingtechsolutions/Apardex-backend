@@ -28,8 +28,31 @@ export class ReviewService {
       throw new BadRequestException('You can only review your own bookings');
     }
 
-    if (booking.status !== BookingStatus.COMPLETED) {
+    // A booking is reviewable once the stay is over. Because nothing
+    // auto-transitions bookings to COMPLETED, we also treat a confirmed/active
+    // booking whose check-out date has passed as reviewable.
+    const stayEnded = this.hasStayEnded(booking.checkOut);
+    const reviewable =
+      booking.status === BookingStatus.COMPLETED ||
+      (stayEnded &&
+        (booking.status === BookingStatus.CONFIRMED ||
+          booking.status === BookingStatus.ACTIVE));
+
+    if (!reviewable) {
+      if (booking.status === BookingStatus.CANCELLED) {
+        throw new BadRequestException('You cannot review a cancelled booking');
+      }
+      if (!stayEnded) {
+        throw new BadRequestException(
+          'You can only review a booking after your stay has ended',
+        );
+      }
       throw new BadRequestException('You can only review completed bookings');
+    }
+
+    // Sync the stored status so it reflects the completed stay going forward.
+    if (booking.status !== BookingStatus.COMPLETED) {
+      await this.bookingService.markCompleted(booking.id);
     }
 
     if (booking.property?.hostId === userId) {
@@ -48,6 +71,12 @@ export class ReviewService {
     await this.updatePropertyRating(dto.propertyId);
 
     return saved;
+  }
+
+  private hasStayEnded(checkOut: string): boolean {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return new Date(checkOut).getTime() <= today.getTime();
   }
 
   async findByProperty(propertyId: string): Promise<Review[]> {

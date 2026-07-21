@@ -77,6 +77,10 @@ export class UserService {
     return this.userRepository.findOne({ where: { email } });
   }
 
+  async findByGoogleId(googleId: string): Promise<User | null> {
+    return this.userRepository.findOne({ where: { googleId } });
+  }
+
   async findByEmailWithPassword(email: string): Promise<User | null> {
     return this.userRepository
       .createQueryBuilder('user')
@@ -127,6 +131,10 @@ export class UserService {
       .getOne();
 
     if (!user) throw new NotFoundException('User not found');
+    if (!user.password)
+      throw new BadRequestException(
+        'This account uses Google sign-in and has no password set',
+      );
 
     const isMatch = await bcrypt.compare(dto.currentPassword, user.password);
     if (!isMatch)

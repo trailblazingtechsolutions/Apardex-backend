@@ -53,8 +53,7 @@ export class UserController {
     schema: {
       type: 'object',
       properties: {
-        firstName: { type: 'string', example: 'John' },
-        lastName: { type: 'string', example: 'Doe' },
+        fullName: { type: 'string', example: 'John Doe' },
         phoneNumber: { type: 'string', example: '+2348012345678' },
         location: { type: 'string', example: 'Lagos, Nigeria' },
         bio: { type: 'string', example: 'I love travelling.' },

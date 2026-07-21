@@ -111,6 +111,13 @@ export class BookingService {
     return booking;
   }
 
+  async markCompleted(id: string): Promise<Booking> {
+    await this.bookingRepository.update(id, {
+      status: BookingStatus.COMPLETED,
+    });
+    return this.findById(id);
+  }
+
   async findUserBookings(
     userId: string,
     status?: BookingStatus,

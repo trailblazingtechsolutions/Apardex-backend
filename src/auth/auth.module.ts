@@ -9,6 +9,7 @@ import {
   AdminAuthController,
 } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { SocialAuthService } from './social-auth.service';
 import { UserModule } from '../user/user.module';
 import { MailerModule } from '../mailer/mailer.module';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
@@ -29,7 +30,7 @@ import { CloudinaryModule } from '../cloudinary/cloudinary.module';
     }),
   ],
   controllers: [UserAuthController, HostAuthController, AdminAuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, SocialAuthService],
   exports: [AuthService],
 })
 export class AuthModule {}

@@ -1,6 +1,8 @@
 import {
   Body,
   Controller,
+  HttpCode,
+  HttpStatus,
   Post,
   Req,
   UploadedFile,
@@ -27,6 +29,8 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UserRole } from '../user/user.entity';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { SocialAuthService } from './social-auth.service';
+import { SocialAuthDto } from './dto/social-auth.dto';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { User } from '../user/user.entity';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
@@ -37,7 +41,34 @@ import { UserService } from '../user/user.service';
 @ApiTags('User Auth')
 @Controller('auth/user')
 export class UserAuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly socialAuthService: SocialAuthService,
+  ) {}
+
+  @Post('google')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Sign in / Sign up with Google',
+    description:
+      'Send the **Google ID token** obtained from the client-side Google Sign-In SDK. ' +
+      'A new account is created automatically if the email is not yet registered; ' +
+      'otherwise the existing account is signed in. Returns access + refresh tokens.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns access token, refresh token, and isNewUser flag',
+  })
+  @ApiResponse({ status: 401, description: 'Invalid or expired Google token' })
+  googleAuth(@Body() dto: SocialAuthDto, @Req() req: Request) {
+    const ip =
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ??
+      req.ip;
+    return this.socialAuthService.googleAuth(dto, {
+      ip,
+      userAgent: req.headers['user-agent'],
+    });
+  }
 
   @Post('register')
   @ApiOperation({ summary: 'Register a new user' })

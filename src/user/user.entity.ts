@@ -20,6 +20,11 @@ export enum KycStatus {
   FLAGGED = 'flagged',
 }
 
+export enum AuthProvider {
+  LOCAL = 'local',
+  GOOGLE = 'google',
+}
+
 export enum AdminRole {
   SUPER_ADMIN = 'super_admin',
   FINANCIAL_OFFICER = 'financial_officer',
@@ -36,6 +41,10 @@ export class User {
   hostCode!: string | null;
 
   @Column({ nullable: true })
+  fullName!: string;
+
+  // Retained for admin/team members who are stored with separate name parts.
+  @Column({ nullable: true })
   firstName!: string;
 
   @Column({ nullable: true })
@@ -44,8 +53,15 @@ export class User {
   @Column({ unique: true })
   email!: string;
 
-  @Column({ select: false })
-  password!: string;
+  @Column({ type: 'varchar', select: false, nullable: true })
+  password!: string | null;
+
+  // Social auth (e.g. Google) — null for password-based accounts
+  @Column({ type: 'varchar', unique: true, nullable: true })
+  googleId!: string | null;
+
+  @Column({ type: 'enum', enum: AuthProvider, default: AuthProvider.LOCAL })
+  authProvider!: AuthProvider;
 
   @Column({ type: 'enum', enum: UserRole, default: UserRole.USER })
   role!: UserRole;
