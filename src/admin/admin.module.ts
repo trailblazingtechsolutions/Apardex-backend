@@ -15,12 +15,14 @@ import { AdminService } from './admin.service';
 import { AdminController } from './admin.controller';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { SupportModule } from '../support/support.module';
+import { UserModule } from '../user/user.module';
 
 @Module({
   imports: [
     ConfigModule,
     NotificationsModule,
     SupportModule,
+    UserModule,
     TypeOrmModule.forFeature([
       User,
       Property,

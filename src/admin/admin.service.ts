@@ -37,6 +37,7 @@ import { PayoutFiltersDto, CreatePayoutDto } from './dto/payout-filters.dto';
 import { GenerateReportDto } from './dto/report.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/notification.entity';
+import { UserService } from '../user/user.service';
 
 @Injectable()
 export class AdminService {
@@ -62,6 +63,7 @@ export class AdminService {
     @InjectRepository(AdminNotificationPreferences)
     private readonly adminNotifPrefsRepo: Repository<AdminNotificationPreferences>,
     private readonly notificationsService: NotificationsService,
+    private readonly userService: UserService,
   ) {}
 
   // ─── Seed / Bootstrap ────────────────────────────────────────────────────────
@@ -960,25 +962,15 @@ export class AdminService {
     return this.getAdminProfile(adminId);
   }
 
-  async changeAdminPassword(adminId: string, dto: ChangeAdminPasswordDto): Promise<{ message: string }> {
-    const admin = await this.userRepo
-      .createQueryBuilder('u')
-      .addSelect('u.password')
-      .where('u.id = :adminId', { adminId })
-      .getOne();
-    if (!admin) throw new NotFoundException('Admin not found');
-    if (!admin.password)
-      throw new BadRequestException('This account has no password set');
-
-    const valid = await bcrypt.compare(dto.currentPassword, admin.password);
-    if (!valid) throw new BadRequestException('Current password is incorrect');
-
-    const hashed = await bcrypt.hash(dto.newPassword, 8);
-    await this.userRepo.update(adminId, {
-      password: hashed,
-      tokenVersion: (admin.tokenVersion ?? 0) + 1,
-    });
-    return { message: 'Password updated successfully' };
+  /**
+   * Thin delegate — the admin settings screen keeps its own route, but the
+   * password logic lives in one place for every account type.
+   */
+  changeAdminPassword(
+    adminId: string,
+    dto: ChangeAdminPasswordDto,
+  ): Promise<{ message: string }> {
+    return this.userService.changePassword(adminId, dto);
   }
 
   // ─── Payments (Financial Officer) ────────────────────────────────────────────

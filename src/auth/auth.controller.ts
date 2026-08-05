@@ -97,7 +97,7 @@ export class UserAuthController {
   @ApiResponse({ status: 200, description: 'Email verified successfully' })
   @ApiResponse({ status: 400, description: 'Invalid or expired OTP' })
   verifyEmail(@Body() dto: VerifyOtpDto) {
-    return this.authService.verifyEmail(dto);
+    return this.authService.verifyEmail(dto, UserRole.USER);
   }
 
   @Post('resend-otp')
@@ -110,14 +110,14 @@ export class UserAuthController {
     description: 'No account found / already verified',
   })
   resendOtp(@Body() dto: ForgotPasswordDto) {
-    return this.authService.resendVerificationOtp(dto.email);
+    return this.authService.resendVerificationOtp(dto.email, UserRole.USER);
   }
 
   @Post('forgot-password')
   @ApiOperation({ summary: 'Request password reset OTP' })
   @ApiResponse({ status: 200, description: 'Reset OTP sent if email exists' })
   forgotPassword(@Body() dto: ForgotPasswordDto) {
-    return this.authService.forgotPassword(dto);
+    return this.authService.forgotPassword(dto, UserRole.USER);
   }
 
   @Post('reset-password')
@@ -125,7 +125,7 @@ export class UserAuthController {
   @ApiResponse({ status: 200, description: 'Password reset successfully' })
   @ApiResponse({ status: 400, description: 'Invalid or expired OTP' })
   resetPassword(@Body() dto: ResetPasswordDto) {
-    return this.authService.resetPassword(dto);
+    return this.authService.resetPassword(dto, UserRole.USER);
   }
 
   @Post('refresh')
@@ -201,7 +201,7 @@ export class HostAuthController {
   @ApiResponse({ status: 200, description: 'Email verified successfully' })
   @ApiResponse({ status: 400, description: 'Invalid or expired OTP' })
   verifyEmail(@Body() dto: VerifyOtpDto) {
-    return this.authService.verifyEmail(dto);
+    return this.authService.verifyEmail(dto, UserRole.HOST);
   }
 
   @Post('resend-otp')
@@ -214,14 +214,14 @@ export class HostAuthController {
     description: 'No account found / already verified',
   })
   resendOtp(@Body() dto: ForgotPasswordDto) {
-    return this.authService.resendVerificationOtp(dto.email);
+    return this.authService.resendVerificationOtp(dto.email, UserRole.HOST);
   }
 
   @Post('forgot-password')
   @ApiOperation({ summary: 'Request password reset OTP' })
   @ApiResponse({ status: 200, description: 'Reset OTP sent if email exists' })
   forgotPassword(@Body() dto: ForgotPasswordDto) {
-    return this.authService.forgotPassword(dto);
+    return this.authService.forgotPassword(dto, UserRole.HOST);
   }
 
   @Post('reset-password')
@@ -229,7 +229,7 @@ export class HostAuthController {
   @ApiResponse({ status: 200, description: 'Password reset successfully' })
   @ApiResponse({ status: 400, description: 'Invalid or expired OTP' })
   resetPassword(@Body() dto: ResetPasswordDto) {
-    return this.authService.resetPassword(dto);
+    return this.authService.resetPassword(dto, UserRole.HOST);
   }
 
   @Post('refresh')
@@ -309,13 +309,13 @@ export class AdminAuthController {
   @Post('forgot-password')
   @ApiOperation({ summary: 'Request admin password reset OTP' })
   forgotPassword(@Body() dto: ForgotPasswordDto) {
-    return this.authService.forgotPassword(dto);
+    return this.authService.forgotPassword(dto, UserRole.ADMIN);
   }
 
   @Post('reset-password')
   @ApiOperation({ summary: 'Reset admin password using OTP' })
   resetPassword(@Body() dto: ResetPasswordDto) {
-    return this.authService.resetPassword(dto);
+    return this.authService.resetPassword(dto, UserRole.ADMIN);
   }
 
   @Post('refresh')

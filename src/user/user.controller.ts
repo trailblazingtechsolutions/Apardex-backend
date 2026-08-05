@@ -79,15 +79,15 @@ export class UserController {
   // ─── Password ───────────────────────────────────────────────────────────────
 
   @Patch('change-password')
-  @ApiOperation({ summary: 'Change account password' })
+  @ApiOperation({
+    summary: 'Change account password (user, host and admin accounts)',
+    description:
+      'All existing sessions are invalidated on success — the client must log in again.',
+  })
   @ApiResponse({ status: 200, description: 'Password changed successfully' })
   @ApiResponse({ status: 400, description: 'Current password is incorrect' })
-  async changePassword(
-    @CurrentUser() user: User,
-    @Body() dto: ChangePasswordDto,
-  ) {
-    await this.userService.changePassword(user.id, dto);
-    return { message: 'Password changed successfully' };
+  changePassword(@CurrentUser() user: User, @Body() dto: ChangePasswordDto) {
+    return this.userService.changePassword(user.id, dto);
   }
 
   // ─── Preferences ────────────────────────────────────────────────────────────

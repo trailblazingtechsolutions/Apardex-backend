@@ -140,9 +140,12 @@ export class AuthService {
     };
   }
 
-  async verifyEmail(dto: VerifyOtpDto) {
+  async verifyEmail(dto: VerifyOtpDto, expectedRole: UserRole) {
     const user = await this.userService.findByEmail(dto.email);
-    if (!user) throw new BadRequestException('Invalid email');
+    // Verification is scoped to the role that owns the endpoint — same response
+    // for a missing account and for one belonging to another role.
+    if (!user || user.role !== expectedRole)
+      throw new BadRequestException('Invalid email');
 
     if (user.otp !== dto.otp) throw new BadRequestException('Invalid OTP');
     if (!user.otpExpiresAt || new Date() > user.otpExpiresAt)
@@ -256,9 +259,12 @@ export class AuthService {
     return { ...tokens, isNewUser };
   }
 
-  async resendVerificationOtp(email: string) {
+  async resendVerificationOtp(email: string, expectedRole: UserRole) {
     const user = await this.userService.findByEmail(email);
-    if (!user) throw new BadRequestException('No account found with this email');
+    // Role mismatch is indistinguishable from a missing account, so /auth/host
+    // can't be used to enumerate which addresses are regular users.
+    if (!user || user.role !== expectedRole)
+      throw new BadRequestException('No account found with this email');
 
     if (user.isEmailVerified)
       throw new BadRequestException('This email is already verified');
@@ -280,9 +286,11 @@ export class AuthService {
     return { message: 'A new OTP has been sent to your email.' };
   }
 
-  async forgotPassword(dto: ForgotPasswordDto) {
+  async forgotPassword(dto: ForgotPasswordDto, expectedRole: UserRole) {
     const user = await this.userService.findByEmail(dto.email);
-    if (!user)
+    // Same response whether the account is missing or belongs to another role —
+    // /auth/user must not confirm that an address is an admin account.
+    if (!user || user.role !== expectedRole)
       return { message: 'If this email exists, a reset OTP has been sent.' };
 
     const otp = this.generateOtp();
@@ -302,22 +310,28 @@ export class AuthService {
     return { message: 'If this email exists, a reset OTP has been sent.' };
   }
 
-  async resetPassword(dto: ResetPasswordDto) {
+  async resetPassword(dto: ResetPasswordDto, expectedRole: UserRole) {
     const user = await this.userService.findByEmail(dto.email);
-    if (!user) throw new BadRequestException('Invalid email');
+    // A role mismatch is reported exactly like a missing account, so the
+    // per-role endpoints can't be used to probe for admin/host addresses.
+    if (!user || user.role !== expectedRole)
+      throw new BadRequestException('Invalid email');
 
     if (user.otp !== dto.otp) throw new BadRequestException('Invalid OTP');
     if (!user.otpExpiresAt || new Date() > user.otpExpiresAt)
       throw new BadRequestException('OTP has expired');
 
-    const hashedPassword = await bcrypt.hash(dto.newPassword, 8);
     await this.userService.update(user.id, {
-      password: hashedPassword,
       otp: null,
       otpExpiresAt: null,
     });
+    // Rotates the credential and drops every existing session — a reset is the
+    // recovery path for a compromised account, so old tokens must not survive.
+    await this.userService.setPassword(user, dto.newPassword);
 
-    return { message: 'Password reset successfully' };
+    return {
+      message: 'Password reset successfully. Please log in again.',
+    };
   }
 
   async refresh(rawRefreshToken: string): Promise<{ accessToken: string }> {

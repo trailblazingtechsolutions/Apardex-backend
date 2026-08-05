@@ -123,7 +123,16 @@ export class UserService {
     return this.findById(id);
   }
 
-  async changePassword(id: string, dto: ChangePasswordDto): Promise<void> {
+  /**
+   * Single source of truth for an authenticated password change — used by every
+   * user type (user, host, admin). Verifies the current password, then rotates
+   * the credential and invalidates every existing session so old access tokens
+   * and refresh tokens stop working.
+   */
+  async changePassword(
+    id: string,
+    dto: ChangePasswordDto,
+  ): Promise<{ message: string }> {
     const user = await this.userRepository
       .createQueryBuilder('user')
       .addSelect('user.password')
@@ -140,8 +149,26 @@ export class UserService {
     if (!isMatch)
       throw new BadRequestException('Current password is incorrect');
 
-    const hashed = await bcrypt.hash(dto.newPassword, 8);
-    await this.userRepository.update(id, { password: hashed });
+    await this.setPassword(user, dto.newPassword);
+
+    return {
+      message: 'Password changed successfully. Please log in again.',
+    };
+  }
+
+  /**
+   * Hashes and stores a new password, then invalidates all outstanding
+   * credentials for the account: bumping `tokenVersion` kills issued access
+   * tokens, and deactivating sessions kills refresh tokens (otherwise a stale
+   * refresh token could mint a fresh access token after the change).
+   */
+  async setPassword(user: User, newPassword: string): Promise<void> {
+    const hashed = await bcrypt.hash(newPassword, 8);
+    await this.userRepository.update(user.id, {
+      password: hashed,
+      tokenVersion: (user.tokenVersion ?? 0) + 1,
+    });
+    await this.revokeAllSessions(user.id);
   }
 
   async getDashboard(userId: string) {
@@ -503,5 +530,12 @@ export class UserService {
       { isActive: false },
     );
     return { message: 'All other devices have been logged out' };
+  }
+
+  async revokeAllSessions(userId: string): Promise<void> {
+    await this.sessionRepository.update(
+      { userId, isActive: true },
+      { isActive: false },
+    );
   }
 }
