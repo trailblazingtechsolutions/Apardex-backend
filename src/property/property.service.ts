@@ -13,6 +13,13 @@ import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { SearchPropertyDto } from './dto/search-property.dto';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
+// Entity + shared availability rule only — importing BookingModule here would
+// close a cycle, since BookingModule depends on PropertyService.
+import {
+  activeHoldCondition,
+  BLOCKING_BOOKING_STATUSES,
+  Booking,
+} from '../booking/booking.entity';
 
 @Injectable()
 export class PropertyService {
@@ -21,6 +28,8 @@ export class PropertyService {
     private readonly propertyRepository: Repository<Property>,
     @InjectRepository(PropertyAvailability)
     private readonly availabilityRepository: Repository<PropertyAvailability>,
+    @InjectRepository(Booking)
+    private readonly bookingRepository: Repository<Booking>,
     private readonly cloudinaryService: CloudinaryService,
   ) {}
 
@@ -228,6 +237,65 @@ export class PropertyService {
     });
     if (!entry) throw new NotFoundException('Blocked date not found');
     await this.availabilityRepository.delete(entry.id);
+  }
+
+  /**
+   * Everything that makes a date unsellable, in one place: dates the host
+   * blocked, plus date ranges held by a paid booking or a reservation whose
+   * payment window is still open. Abandoned and expired reservations are absent
+   * by design — they used to show as booked here even though nobody had paid.
+   */
+  async getCalendar(propertyId: string): Promise<{
+    blockedDates: string[];
+    bookedRanges: {
+      checkIn: string;
+      checkOut: string;
+      isPaid: boolean;
+      holdExpiresAt: Date | null;
+    }[];
+    unavailableDates: string[];
+  }> {
+    await this.findById(propertyId);
+
+    const blocked = await this.getBlockedDates(propertyId);
+    const blockedDates = blocked.map((b) => b.date);
+
+    const held = await this.bookingRepository
+      .createQueryBuilder('b')
+      .where('b.propertyId = :propertyId', { propertyId })
+      .andWhere('b.status IN (:...statuses)', {
+        statuses: BLOCKING_BOOKING_STATUSES,
+      })
+      .andWhere(activeHoldCondition('b'))
+      .andWhere('b.checkOut >= CURRENT_DATE')
+      .orderBy('b.checkIn', 'ASC')
+      .getMany();
+
+    const bookedRanges = held.map((b) => ({
+      checkIn: b.checkIn,
+      checkOut: b.checkOut,
+      isPaid: b.isPaid,
+      holdExpiresAt: b.isPaid ? null : b.paymentDueAt,
+    }));
+
+    // Nights occupied run from check-in up to (not including) check-out — the
+    // check-out day is free for the next guest.
+    const unavailable = new Set(blockedDates);
+    for (const range of bookedRanges) {
+      for (
+        const day = new Date(range.checkIn);
+        day < new Date(range.checkOut);
+        day.setUTCDate(day.getUTCDate() + 1)
+      ) {
+        unavailable.add(day.toISOString().split('T')[0]);
+      }
+    }
+
+    return {
+      blockedDates,
+      bookedRanges,
+      unavailableDates: [...unavailable].sort(),
+    };
   }
 
   async isAvailable(

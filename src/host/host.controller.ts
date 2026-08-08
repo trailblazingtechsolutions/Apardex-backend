@@ -89,10 +89,10 @@ export class HostController {
     return this.hostService.getPayouts(user.id);
   }
 
-  // ─── Documents ──────────────────────────────────────────────────────────────
+  // ─── Documents / KYC ────────────────────────────────────────────────────────
 
   @Get('documents')
-  @ApiOperation({ summary: 'List uploaded documents' })
+  @ApiOperation({ summary: 'List uploaded documents and their review status' })
   getDocuments(@CurrentUser() user: User) {
     return this.hostService.getDocuments(user.id);
   }
@@ -100,7 +100,12 @@ export class HostController {
   @Post('documents')
   @UseInterceptors(FileInterceptor('document', { storage: memoryStorage() }))
   @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Upload an additional document' })
+  @ApiOperation({
+    summary: 'Upload an identity/KYC document from the host profile',
+    description:
+      'Submitting a document places the host in the admin KYC review queue. A host whose KYC was rejected returns to pending on re-upload.',
+  })
+  @ApiResponse({ status: 400, description: 'Document file is required' })
   uploadDocument(
     @CurrentUser() user: User,
     @Body() dto: UploadDocumentDto,

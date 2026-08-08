@@ -1,11 +1,12 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User, UserRole } from '../user/user.entity';
+import { KycStatus, User, UserRole } from '../user/user.entity';
 import { HostPayoutMethod } from './entities/host-payout-method.entity';
 import { HostPayout } from './entities/host-payout.entity';
 import { HostPreferences } from './entities/host-preferences.entity';
@@ -34,7 +35,8 @@ export class HostService {
   private async assertHost(userId: string): Promise<User> {
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
-    if (user.role !== UserRole.HOST) throw new ForbiddenException('Host access only');
+    if (user.role !== UserRole.HOST)
+      throw new ForbiddenException('Host access only');
     return user;
   }
 
@@ -70,7 +72,9 @@ export class HostService {
     if (!method) throw new NotFoundException('Payout method not found');
     await this.payoutMethodRepo.update({ hostId }, { isDefault: false });
     await this.payoutMethodRepo.update(id, { isDefault: true });
-    return this.payoutMethodRepo.findOne({ where: { id } }) as Promise<HostPayoutMethod>;
+    return this.payoutMethodRepo.findOne({
+      where: { id },
+    }) as Promise<HostPayoutMethod>;
   }
 
   async removePayoutMethod(
@@ -84,7 +88,8 @@ export class HostService {
     await this.payoutMethodRepo.remove(method);
     if (method.isDefault) {
       const next = await this.payoutMethodRepo.findOne({ where: { hostId } });
-      if (next) await this.payoutMethodRepo.update(next.id, { isDefault: true });
+      if (next)
+        await this.payoutMethodRepo.update(next.id, { isDefault: true });
     }
     return { message: 'Payout method removed' };
   }
@@ -154,11 +159,19 @@ export class HostService {
     return docs;
   }
 
+  /**
+   * KYC document submission, done from the host's profile rather than at signup.
+   * Saving a HostDocument is what surfaces the host in the admin KYC queue
+   * (see AdminService.getKycQueue).
+   */
   async uploadDocument(
     hostId: string,
     dto: UploadDocumentDto,
     file: Express.Multer.File,
   ) {
+    const host = await this.assertHost(hostId);
+    if (!file) throw new BadRequestException('Document file is required');
+
     const result = await this.cloudinaryService.uploadFile(file, 'documents');
     const doc = await this.documentRepo.save(
       this.documentRepo.create({
@@ -168,6 +181,17 @@ export class HostService {
         isVerified: false,
       }),
     );
+
+    // A rejected host who submits a new document is resubmitting — put them
+    // back in the pending queue so reviewers see the new upload. Approved and
+    // flagged hosts keep their status; those are admin decisions to revisit.
+    if (host.kycStatus === KycStatus.REJECTED) {
+      await this.userRepo.update(hostId, {
+        kycStatus: KycStatus.PENDING,
+        kycRejectionReason: null,
+      });
+    }
+
     return doc;
   }
 

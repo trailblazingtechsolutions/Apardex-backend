@@ -16,6 +16,7 @@ import { AdminController } from './admin.controller';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { SupportModule } from '../support/support.module';
 import { UserModule } from '../user/user.module';
+import { MailerModule } from '../mailer/mailer.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { UserModule } from '../user/user.module';
     NotificationsModule,
     SupportModule,
     UserModule,
+    MailerModule,
     TypeOrmModule.forFeature([
       User,
       Property,

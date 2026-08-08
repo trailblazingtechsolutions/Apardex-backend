@@ -5,10 +5,13 @@ import { PropertyAvailability } from './property-availability.entity';
 import { PropertyService } from './property.service';
 import { PropertyController } from './property.controller';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
+import { Booking } from '../booking/booking.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Property, PropertyAvailability]),
+    // Booking is registered for the public availability calendar; the entity is
+    // used directly rather than importing BookingModule, which would be a cycle.
+    TypeOrmModule.forFeature([Property, PropertyAvailability, Booking]),
     CloudinaryModule,
   ],
   controllers: [PropertyController],

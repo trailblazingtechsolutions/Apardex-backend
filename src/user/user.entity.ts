@@ -133,6 +133,11 @@ export class User {
   @Column({ default: 0 })
   tokenVersion!: number;
 
+  // Set for accounts created with a temporary password (invited admins). While
+  // true, JwtAuthGuard only allows the change-password and logout routes.
+  @Column({ default: false })
+  mustChangePassword!: boolean;
+
   // Transient — set by JwtStrategy after validation, never persisted
   currentSessionId?: string;
 

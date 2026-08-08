@@ -66,6 +66,13 @@ export class PaymentService {
     if (booking.status === BookingStatus.CANCELLED) {
       throw new BadRequestException('Cannot pay for a cancelled booking');
     }
+    // The dates are no longer held, so taking money here would sell a stay we
+    // may already have given away.
+    if (booking.paymentDueAt && booking.paymentDueAt.getTime() <= Date.now()) {
+      throw new BadRequestException(
+        'This reservation has expired and its dates have been released. Please make a new reservation.',
+      );
+    }
 
     // Route to provider based on payment method + currency
     let providerName: PaymentProviderName;
@@ -155,6 +162,21 @@ export class PaymentService {
       await this.paymentRepository.update(payment.id, {
         status: PaymentStatus.FAILED,
       });
+      // The reservation deliberately survives a failed attempt — cards decline
+      // for harmless reasons and the guest can retry until paymentDueAt, at
+      // which point BookingService releases the dates.
+      const booking = await this.bookingRepository.findOne({
+        where: { id: payment.bookingId },
+      });
+      await this.notificationsService.create(
+        payment.userId,
+        NotificationType.GENERAL,
+        'Payment Failed',
+        booking?.paymentDueAt
+          ? `Your payment could not be completed. Your dates are still held until ${booking.paymentDueAt.toISOString().replace('T', ' ').slice(0, 16)} UTC — please try again before then.`
+          : 'Your payment could not be completed. Please try again to keep your reservation.',
+        payment.bookingId,
+      );
       return;
     }
 

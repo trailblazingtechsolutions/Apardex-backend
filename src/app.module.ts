@@ -40,10 +40,16 @@ import { SupportModule } from './support/support.module';
             : false,
         synchronize: config.get<string>('DB_SYNC') === 'true',
         autoLoadEntities: true,
+        // Serverless Postgres (Neon) suspends idle compute and can take ~10-20s
+        // to wake, so the first request after a quiet period was exceeding the
+        // pool's connect timeout and surfacing as a 500.
+        retryAttempts: 5,
+        retryDelay: 3000,
         extra: {
           max: 5,
           idleTimeoutMillis: 30000,
-          connectionTimeoutMillis: 15000,
+          connectionTimeoutMillis: 45000,
+          keepAlive: true,
         },
       }),
     }),

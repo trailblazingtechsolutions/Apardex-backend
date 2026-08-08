@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   ConflictException,
   BadRequestException,
@@ -38,9 +39,19 @@ import { GenerateReportDto } from './dto/report.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/notification.entity';
 import { UserService } from '../user/user.service';
+import { MailerService } from '../mailer/mailer.service';
+
+const ADMIN_ROLE_LABELS: Record<AdminRole, string> = {
+  [AdminRole.SUPER_ADMIN]: 'Super Admin',
+  [AdminRole.FINANCIAL_OFFICER]: 'Financial Officer',
+  [AdminRole.KYC_REVIEWER]: 'KYC Reviewer',
+  [AdminRole.SUPPORT_AGENT]: 'Support Agent',
+};
 
 @Injectable()
 export class AdminService {
+  private readonly logger = new Logger(AdminService.name);
+
   constructor(
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
@@ -64,6 +75,7 @@ export class AdminService {
     private readonly adminNotifPrefsRepo: Repository<AdminNotificationPreferences>,
     private readonly notificationsService: NotificationsService,
     private readonly userService: UserService,
+    private readonly mailerService: MailerService,
   ) {}
 
   // ─── Seed / Bootstrap ────────────────────────────────────────────────────────
@@ -428,11 +440,20 @@ export class AdminService {
 
   // ─── KYC ─────────────────────────────────────────────────────────────────────
 
+  /**
+   * A host counts as having submitted KYC when they have a row in
+   * host_documents — the profile upload path. `users.documentUrl` is only
+   * checked for hosts who registered back when signup collected the document.
+   */
+  private hasSubmittedDocuments(): string {
+    return `(u."documentUrl" IS NOT NULL OR EXISTS (SELECT 1 FROM host_documents d WHERE d."hostId" = u.id))`;
+  }
+
   async getKycQueue(status?: KycStatus, page = 1, limit = 20) {
     const qb = this.userRepo
       .createQueryBuilder('u')
       .where('u.role = :role', { role: UserRole.HOST })
-      .andWhere('u.documentUrl IS NOT NULL')
+      .andWhere(this.hasSubmittedDocuments())
       .orderBy('u.createdAt', 'ASC');
 
     if (status) {
@@ -554,7 +575,7 @@ export class AdminService {
     const recentSubmissions = await this.userRepo
       .createQueryBuilder('u')
       .where('u.role = :role', { role: UserRole.HOST })
-      .andWhere('u.documentUrl IS NOT NULL')
+      .andWhere(this.hasSubmittedDocuments())
       .orderBy('u.updatedAt', 'DESC')
       .limit(10)
       .getMany();
@@ -883,12 +904,14 @@ export class AdminService {
     });
   }
 
-  async inviteTeamMember(dto: InviteTeamMemberDto): Promise<{ user: User; temporaryPassword: string }> {
+  async inviteTeamMember(
+    dto: InviteTeamMemberDto,
+  ): Promise<{ user: Partial<User>; temporaryPassword: string }> {
     const existing = await this.userRepo.findOne({ where: { email: dto.email } });
     if (existing) throw new ConflictException('Email already in use');
     const temporaryPassword = randomBytes(6).toString('hex');
     const hashed = await bcrypt.hash(temporaryPassword, 8);
-    const user = await this.userRepo.save(
+    const saved = await this.userRepo.save(
       this.userRepo.create({
         email: dto.email,
         firstName: dto.firstName,
@@ -898,8 +921,31 @@ export class AdminService {
         adminRole: dto.adminRole,
         isEmailVerified: true,
         kycStatus: KycStatus.APPROVED,
+        // Temporary password — locked out of the dashboard until they set their own.
+        mustChangePassword: true,
       }),
     );
+
+    // Email delivery must not fail the invite; the response still carries the
+    // temporary password so a super admin can pass it on manually.
+    this.logger.log(`Sending admin invite email to ${saved.email}...`);
+    try {
+      await this.mailerService.sendAdminInvite(
+        saved.email,
+        saved.firstName ?? 'there',
+        temporaryPassword,
+        ADMIN_ROLE_LABELS[dto.adminRole],
+      );
+      this.logger.log(`Admin invite email sent to ${saved.email}`);
+    } catch (err) {
+      this.logger.error(`Failed to send admin invite email to ${saved.email}`, err);
+    }
+    // `password` is select:false on reads, but save() hands back the in-memory
+    // entity — strip the hash so it never reaches the response body.
+    const user: Partial<User> = saved;
+    delete user.password;
+    delete user.otp;
+    delete user.otpExpiresAt;
     return { user, temporaryPassword };
   }
 
@@ -934,9 +980,11 @@ export class AdminService {
   async getAdminNotificationPreferences(adminId: string): Promise<AdminNotificationPreferences> {
     const existing = await this.adminNotifPrefsRepo.findOne({ where: { adminId } });
     if (existing) return existing;
-    return this.adminNotifPrefsRepo.save(
-      this.adminNotifPrefsRepo.create({ adminId }),
-    );
+    // adminId is unique, so two concurrent first-time loads (the settings page
+    // firing GET and PATCH together) would race and one would hit a unique
+    // violation — upsert makes the default-row creation idempotent.
+    await this.adminNotifPrefsRepo.upsert({ adminId }, ['adminId']);
+    return this.adminNotifPrefsRepo.findOneOrFail({ where: { adminId } });
   }
 
   async updateAdminNotificationPreferences(

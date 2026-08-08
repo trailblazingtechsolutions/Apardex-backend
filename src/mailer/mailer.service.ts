@@ -26,4 +26,18 @@ export class MailerService {
       context: { firstName, otp },
     });
   }
+
+  async sendAdminInvite(
+    email: string,
+    firstName: string,
+    temporaryPassword: string,
+    roleLabel: string,
+  ): Promise<void> {
+    await this.mailer.sendMail({
+      to: email,
+      subject: 'You have been invited to the Apardex admin team',
+      template: 'admin-invite',
+      context: { firstName, email, temporaryPassword, roleLabel },
+    });
+  }
 }

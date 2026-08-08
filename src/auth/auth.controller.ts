@@ -32,9 +32,9 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { SocialAuthService } from './social-auth.service';
 import { SocialAuthDto } from './dto/social-auth.dto';
 import { CurrentUser } from './decorators/current-user.decorator';
+import { AllowWhilePasswordChangeRequired } from './decorators/allow-password-change.decorator';
 import { User } from '../user/user.entity';
-import { CloudinaryService } from '../cloudinary/cloudinary.service';
-import { UserService } from '../user/user.service';
+import { HostService } from '../host/host.service';
 
 // ─── User Auth ───────────────────────────────────────────────────────────────
 
@@ -137,6 +137,7 @@ export class UserAuthController {
 
   @Post('logout')
   @UseGuards(JwtAuthGuard)
+  @AllowWhilePasswordChangeRequired()
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Logout and invalidate current session' })
   logout(@CurrentUser() user: User) {
@@ -151,35 +152,19 @@ export class UserAuthController {
 export class HostAuthController {
   constructor(
     private readonly authService: AuthService,
-    private readonly cloudinaryService: CloudinaryService,
-    private readonly userService: UserService,
+    private readonly hostService: HostService,
   ) {}
 
   @Post('register')
-  @UseInterceptors(FileInterceptor('document', { storage: memoryStorage() }))
-  @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Register a new host (document upload required)' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      required: ['fullName', 'email', 'password', 'phoneNumber', 'document'],
-      properties: {
-        fullName: { type: 'string', example: 'Jane Smith' },
-        email: { type: 'string', example: 'jane@example.com' },
-        password: { type: 'string', example: 'password123' },
-        phoneNumber: { type: 'string', example: '+2348012345678' },
-        document: { type: 'string', format: 'binary' },
-      },
-    },
+  @ApiOperation({
+    summary: 'Register a new host',
+    description:
+      'Identity documents are no longer collected here — hosts submit them after signup via POST /host/documents, which places them in the admin KYC review queue.',
   })
   @ApiResponse({ status: 201, description: 'OTP sent to email' })
-  @ApiResponse({ status: 400, description: 'Document file is required' })
   @ApiResponse({ status: 409, description: 'Email already in use' })
-  register(
-    @Body() dto: HostRegisterDto,
-    @UploadedFile() document: Express.Multer.File,
-  ) {
-    return this.authService.registerHost(dto, document);
+  register(@Body() dto: HostRegisterDto) {
+    return this.authService.registerHost(dto);
   }
 
   @Post('login')
@@ -241,17 +226,28 @@ export class HostAuthController {
 
   @Post('logout')
   @UseGuards(JwtAuthGuard)
+  @AllowWhilePasswordChangeRequired()
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Logout and invalidate current session' })
   logout(@CurrentUser() user: User) {
     return this.authService.logout(user.id, user.currentSessionId!);
   }
 
+  /**
+   * @deprecated Kept so existing clients keep working — POST /host/documents is
+   * the canonical route. This used to write `documentUrl` straight onto the user
+   * without creating a HostDocument row, which meant the upload never reached
+   * the admin KYC queue; it now delegates to the same path as the profile upload.
+   */
   @Post('upload-document')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('document', { storage: memoryStorage() }))
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Upload host identity document (requires auth)' })
+  @ApiOperation({
+    summary: 'Upload host identity document (deprecated)',
+    deprecated: true,
+    description: 'Use POST /host/documents instead — this delegates to it.',
+  })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
@@ -264,23 +260,13 @@ export class HostAuthController {
   @ApiResponse({ status: 200, description: 'Document uploaded successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async uploadDocument(
-    @UploadedFile()
-    file: {
-      buffer: Buffer;
-      originalname: string;
-      mimetype: string;
-      size: number;
-    },
+    @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: User,
   ) {
-    const result = await this.cloudinaryService.uploadFile(
-      file,
-      'host-documents',
-    );
-    await this.userService.update(user.id, { documentUrl: result.secure_url });
+    const doc = await this.hostService.uploadDocument(user.id, {}, file);
     return {
       message: 'Document uploaded successfully',
-      url: result.secure_url,
+      url: doc.documentUrl,
     };
   }
 }
@@ -326,6 +312,7 @@ export class AdminAuthController {
 
   @Post('logout')
   @UseGuards(JwtAuthGuard)
+  @AllowWhilePasswordChangeRequired()
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Logout and invalidate current session' })
   logout(@CurrentUser() user: User) {

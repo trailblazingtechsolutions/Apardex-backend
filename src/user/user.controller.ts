@@ -23,6 +23,7 @@ import {
 import { UserService } from './user.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { AllowWhilePasswordChangeRequired } from '../auth/decorators/allow-password-change.decorator';
 import { User } from './user.entity';
 import { ChangePasswordDto, UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdatePreferencesDto } from './dto/preferences.dto';
@@ -79,6 +80,7 @@ export class UserController {
   // ─── Password ───────────────────────────────────────────────────────────────
 
   @Patch('change-password')
+  @AllowWhilePasswordChangeRequired()
   @ApiOperation({
     summary: 'Change account password (user, host and admin accounts)',
     description:

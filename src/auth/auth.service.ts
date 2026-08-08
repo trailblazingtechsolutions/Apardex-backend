@@ -17,7 +17,6 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { MailerService } from '../mailer/mailer.service';
-import { CloudinaryService } from '../cloudinary/cloudinary.service';
 
 @Injectable()
 export class AuthService {
@@ -27,7 +26,6 @@ export class AuthService {
     private readonly userService: UserService,
     private readonly jwtService: JwtService,
     private readonly mailerService: MailerService,
-    private readonly cloudinaryService: CloudinaryService,
   ) {}
 
   private generateOtp(): string {
@@ -96,22 +94,14 @@ export class AuthService {
     };
   }
 
-  async registerHost(
-    dto: HostRegisterDto,
-    documentFile: Express.Multer.File,
-  ) {
-    if (!documentFile)
-      throw new BadRequestException(
-        'Identity document is required for host registration',
-      );
-
+  /**
+   * Signup no longer collects an identity document — hosts register, verify
+   * their email, then submit KYC documents from their profile via
+   * POST /host/documents, which is what puts them in the admin review queue.
+   */
+  async registerHost(dto: HostRegisterDto) {
     const existing = await this.userService.findByEmail(dto.email);
     if (existing) throw new ConflictException('Email already in use');
-
-    const uploadResult = await this.cloudinaryService.uploadFile(
-      documentFile,
-      'host-documents',
-    );
 
     const hashedPassword = await bcrypt.hash(dto.password, 8);
     const otp = this.generateOtp();
@@ -123,7 +113,6 @@ export class AuthService {
       role: UserRole.HOST,
       otp,
       otpExpiresAt: this.getOtpExpiry(),
-      documentUrl: uploadResult.secure_url,
       hostCode: this.generateHostCode(),
     });
 
@@ -184,7 +173,11 @@ export class AuthService {
         'Please verify your email before logging in',
       );
 
-    return this.issueTokens(user, meta);
+    const tokens = await this.issueTokens(user, meta);
+    // Invited admins log in with a temporary password: the token works, but every
+    // route except change-password is blocked until they replace it, so the
+    // client needs to send them straight to the change-password screen.
+    return { ...tokens, mustChangePassword: user.mustChangePassword };
   }
 
   private async issueTokens(

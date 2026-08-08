@@ -25,6 +25,7 @@ import { AdminRolesGuard } from '../auth/guards/admin-roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AdminRoles } from '../auth/decorators/admin-roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { AllowWhilePasswordChangeRequired } from '../auth/decorators/allow-password-change.decorator';
 import { User, UserRole, AdminRole } from '../user/user.entity';
 import { KycStatus } from '../user/user.entity';
 import { PropertyFiltersDto } from './dto/property-filters.dto';
@@ -530,7 +531,12 @@ export class AdminController {
   }
 
   @Patch('settings/security')
-  @ApiOperation({ summary: 'Change admin password' })
+  @AllowWhilePasswordChangeRequired()
+  @ApiOperation({
+    summary: 'Change admin password',
+    description:
+      'Reachable by an invited admin who still holds a temporary password; all other admin routes are blocked until this succeeds.',
+  })
   changePassword(@CurrentUser() user: User, @Body() dto: ChangeAdminPasswordDto) {
     return this.adminService.changeAdminPassword(user.id, dto);
   }

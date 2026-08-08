@@ -83,10 +83,21 @@ export class PropertyController {
   // ─── Availability / Calendar ──────────────────────────────────────────────
 
   @Get(':id/availability')
-  @ApiOperation({ summary: 'Get blocked dates for a property (public)' })
+  @ApiOperation({ summary: 'Get host-blocked dates for a property (public)' })
   @ApiResponse({ status: 200, description: 'List of blocked dates' })
   getBlockedDates(@Param('id') id: string) {
     return this.propertyService.getBlockedDates(id);
+  }
+
+  @Get(':id/calendar')
+  @ApiOperation({
+    summary: 'Get full availability calendar for a property (public)',
+    description:
+      'Host-blocked dates plus dates held by paid bookings and by reservations still inside their payment window. Expired and abandoned reservations are excluded, so a date only appears here if it is genuinely unavailable. Use `unavailableDates` to disable days in a date picker.',
+  })
+  @ApiResponse({ status: 200, description: 'Blocked dates, booked ranges and the combined unavailable list' })
+  getCalendar(@Param('id') id: string) {
+    return this.propertyService.getCalendar(id);
   }
 
   @Post(':id/availability/block')

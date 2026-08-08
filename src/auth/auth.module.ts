@@ -13,12 +13,15 @@ import { SocialAuthService } from './social-auth.service';
 import { UserModule } from '../user/user.module';
 import { MailerModule } from '../mailer/mailer.module';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
+// Provides HostService for the deprecated POST /auth/host/upload-document alias.
+import { HostModule } from '../host/host.module';
 
 @Module({
   imports: [
     UserModule,
     MailerModule,
     CloudinaryModule,
+    HostModule,
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

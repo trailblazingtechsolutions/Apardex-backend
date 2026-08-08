@@ -167,6 +167,8 @@ export class UserService {
     await this.userRepository.update(user.id, {
       password: hashed,
       tokenVersion: (user.tokenVersion ?? 0) + 1,
+      // The account now has a password its owner chose, so the invite lock lifts.
+      mustChangePassword: false,
     });
     await this.revokeAllSessions(user.id);
   }
