@@ -494,7 +494,11 @@ export class AdminController {
 
   @Post('settings/team/invite')
   @AdminRoles(AdminRole.SUPER_ADMIN)
-  @ApiOperation({ summary: 'Invite a new admin team member' })
+  @ApiOperation({
+    summary: 'Invite a new admin team member',
+    description:
+      'Creates the account with a temporary password and emails the invite. Check `emailSent` in the response — when it is false the account still exists and `emailError` says why delivery failed, so the temporary password must be passed on manually.',
+  })
   inviteTeamMember(@Body() dto: InviteTeamMemberDto) {
     return this.adminService.inviteTeamMember(dto);
   }

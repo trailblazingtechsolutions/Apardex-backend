@@ -904,9 +904,12 @@ export class AdminService {
     });
   }
 
-  async inviteTeamMember(
-    dto: InviteTeamMemberDto,
-  ): Promise<{ user: Partial<User>; temporaryPassword: string }> {
+  async inviteTeamMember(dto: InviteTeamMemberDto): Promise<{
+    user: Partial<User>;
+    temporaryPassword: string;
+    emailSent: boolean;
+    emailError: string | null;
+  }> {
     const existing = await this.userRepo.findOne({ where: { email: dto.email } });
     if (existing) throw new ConflictException('Email already in use');
     const temporaryPassword = randomBytes(6).toString('hex');
@@ -926,8 +929,13 @@ export class AdminService {
       }),
     );
 
-    // Email delivery must not fail the invite; the response still carries the
-    // temporary password so a super admin can pass it on manually.
+    // Delivery must not fail the invite — the account is already created and the
+    // response carries the temporary password. But the outcome is reported back
+    // rather than only logged, so a silent mail misconfiguration can't look like
+    // a successful invite in the dashboard.
+    let emailSent = false;
+    let emailError: string | null = null;
+
     this.logger.log(`Sending admin invite email to ${saved.email}...`);
     try {
       await this.mailerService.sendAdminInvite(
@@ -936,8 +944,10 @@ export class AdminService {
         temporaryPassword,
         ADMIN_ROLE_LABELS[dto.adminRole],
       );
+      emailSent = true;
       this.logger.log(`Admin invite email sent to ${saved.email}`);
     } catch (err) {
+      emailError = err instanceof Error ? err.message : 'Unknown mail error';
       this.logger.error(`Failed to send admin invite email to ${saved.email}`, err);
     }
     // `password` is select:false on reads, but save() hands back the in-memory
@@ -946,7 +956,7 @@ export class AdminService {
     delete user.password;
     delete user.otp;
     delete user.otpExpiresAt;
-    return { user, temporaryPassword };
+    return { user, temporaryPassword, emailSent, emailError };
   }
 
   async updateTeamMemberRole(memberId: string, dto: UpdateTeamMemberRoleDto): Promise<{ message: string }> {
